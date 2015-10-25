@@ -11,7 +11,7 @@ type News struct {
 	SubTitle   string       `json:"digest"`
 	BoardId    string       `json:"replyBoard"`
 	PubTime    string       `json:"ptime"`
-	SnapTime   int64        `json:"-"`
+	SnapTime   string       `json:"-"`
 	Body       string       `json:"body"`
 	Images     []*NewsImage `json:"img"`
 
@@ -22,17 +22,18 @@ type News struct {
 type PhotoSet struct {
 	Priority   int    `json:"-"`
 	ReplyCount int    `json:"-"`
-	SnapTime   int64  `json:"-"`
+	SnapTime   string `json:"-"`
 	Body       string `json:"-"`
 
-	ID       string            `json:"postid"`
-	CoverURL string            `json:"cover"`
-	URL      string            `json:"url"`
-	Title    string            `json:"setname"`
-	SubTitle string            `json:"desc"`
-	BoardId  string            `json:"boardid"`
-	PubTime  string            `json:"createdate"`
-	Images   []*PhototSetImage `json:"photos"`
+	ID       string `json:"postid"`
+	CoverURL string `json:"cover"`
+	URL      string `json:"url"`
+	Title    string `json:"setname"`
+	SubTitle string `json:"desc"`
+	BoardId  string `json:"boardid"`
+	PubTime  string `json:"createdate"`
+
+	Images []*PhototSetImage `json:"photos"`
 
 	Replys   []Reply `json:"-"`
 	ViewType int     `json:"-"`

@@ -88,6 +88,7 @@ func getNewsContent(id string) (*News, error) {
 	}
 	//log.Debug("NEWS_CONTENT_PAIN:[%v]", (string)(newsContentPain))
 	var c map[string]*News
+
 	err = json.Unmarshal(newsContentPain, &c)
 	if err != nil {
 		return nil, err
@@ -106,8 +107,9 @@ func getNewsReply(id string, boardId string) ([]Reply, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("URL:[%v]", url)
-	log.Debug("NEWS_REPLY_PAIN[%v]", (string)(newsReplyPain))
+
+	//log.Debug("URL:[%v]", url)
+	//log.Debug("NEWS_REPLY_PAIN[%v]", (string)(newsReplyPain))
 	var c reply_tmp
 	err = json.Unmarshal(newsReplyPain, &c)
 	if err != nil {
@@ -145,13 +147,14 @@ func getNormalNews(item map[string]interface{}) (*generant.Message, error) {
 	flag = flag && can
 	content.URL, can = item["url"].(string)
 	flag = flag && can
+	content.SnapTime, can = item["lmodify"].(string)
+	flag = flag && can
 	pri, can := item["priority"].(float64)
 	flag = flag && can
 	content.Priority = int(pri)
 	if !flag {
 		return nil, errors.New(fmt.Sprintf("can't trans type int, IMGSRC:[%t], URL:[%t], PRIORITY:[%t]\n", item["imgsrc"], item["url"], item["priority"]))
 	}
-	content.SnapTime = time.Now().Unix()
 	content.ViewType = 1
 	return content.ToMsg()
 }
@@ -188,14 +191,14 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 		return nil, errors.New(fmt.Sprintf("photosetID format unparseabe PHOTOTSETID:[%v]", photosetId))
 	}
 
-	log.Debug("%v", pid_parted)
+	//log.Debug("%v", pid_parted)
 
 	//get info
 	url := fmt.Sprintf("http://c.m.163.com/photo/api/set/%s/%s.json", pid_parted[0][4:], pid_parted[1])
 	contentPain, err := netTools.Get(url)
 
-	log.Debug(photosetId)
-	log.Debug("http://c.m.163.com/photo/api/set/%s/%s.json", pid_parted[0][4:], pid_parted[1])
+	//log.Debug(photosetId)
+	//log.Debug("http://c.m.163.com/photo/api/set/%s/%s.json", pid_parted[0][4:], pid_parted[1])
 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("can't get photoset's info, URL:[%s], ERROR:[%s]", url, err.Error()))
@@ -207,7 +210,7 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 		return nil, errors.New(fmt.Sprintf("photoset's info unmarshal error: ERROR[%s]", err.Error()))
 	}
 
-	log.Debug("%v", content)
+	//log.Debug("%v", content)
 
 	//get comment
 	reply, err := getNewsReply(content.ID, content.BoardId)
@@ -230,7 +233,9 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 	if !can {
 		return nil, errors.New(fmt.Sprintf("can't trans type int,  REPLYCOUNT:[%t]\n", item["replyCount"]))
 	}
-	content.SnapTime = time.Now().Unix()
+
+	content.SnapTime, can = item["lmodify"].(string)
+
 	content.ViewType = 2
 
 	return content.ToMsg()
@@ -302,12 +307,15 @@ func getNewsList(listId string, page int) ([]*generant.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	var v map[string]([]map[string]interface{})
 	err = json.Unmarshal(newsListPain, &v)
 	if err != nil {
 		return nil, err
 	}
+
+	//debug_ned, _ := json.MarshalIndent(v, "", "	")
+
+	//log.Debug((string)(debug_ned))
 
 	//log.Debug((string)(newsListPain))
 
@@ -378,6 +386,59 @@ http://c.m.163.com/nc/article/B28K7NTL00031H2L/full.html
 	}
 }
 */
+
+func catchOneTagOnce(tagid string, tag string, pagesOnce int) {
+	stmt, err := generant.GetStmtInsert()
+	if err != nil {
+		log.Error("Error when get STMT, ERROR:[%s]", err.Error())
+		return
+	}
+	defer stmt.Close()
+
+	for i := 0; i < pagesOnce; i++ {
+		news, err := getNewsList(tagid, i)
+		if err != nil {
+			log.Error("Error raisd when catch TAG[%s], PAGENO[%s], ERROR:[%s]", tag, i, err.Error())
+			continue
+		}
+		log.Debug("%d %d", i, len(news))
+		for _, item := range news {
+			item.Type = tag
+			if _, err := item.InsertIntoSQL(stmt); err != nil {
+				log.Error("Error when insert into sql : ERROR:[%s]", err.Error())
+			}
+		}
+	}
+}
+
+func catchOneTagDaemon(tagid string, tag string, pagesOnce int, delay time.Duration) {
+	for {
+		catchOneTagOnce(tagid, tag, pagesOnce)
+		time.Sleep(delay)
+	}
+}
+
+type NeteaseNewsCatchConfigure struct {
+	Tag      string
+	Tagid    string
+	PageOnce int
+	Delay    time.Duration
+}
+
+var (
+	configures []NeteaseNewsCatchConfigure = []NeteaseNewsCatchConfigure{
+		{KEJI_ID, "科技", 4, time.Minute * 10},
+		{TOUTIAO_ID, "头条", 4, time.Minute * 10},
+	}
+)
+
+func StartCatch() {
+	for _, configure := range configures {
+		go catchOneTagDaemon(configure.Tag, configure.Tagid, configure.PageOnce, configure.Delay)
+		//time.Sleep(time.Minute)
+		time.Sleep(time.Second * 10)
+	}
+}
 
 func init() {
 	logging.SetFormatter(logging.MustStringFormatter(

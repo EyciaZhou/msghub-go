@@ -92,8 +92,13 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		return nil, err
 	}
 
+	snapti, err := parseTime(n.SnapTime)
+	if err != nil {
+		snapti = time.Now().Unix()
+	}
+
 	return &generant.Message{
-		SnapTime:    n.SnapTime,
+		SnapTime:    snapti,
 		PubTime:     pubti,
 		Source:      n.URL,
 		Body:        n.Body,
@@ -105,6 +110,7 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		Replys:      replys,
 		ViewType:    n.ViewType,
 		Version:     "0.1",
+		From:        "Netease News",
 	}, nil
 }
 
@@ -136,8 +142,14 @@ func (n *News) ToMsg() (*generant.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	snapti, err := parseTime(n.SnapTime)
+	if err != nil {
+		snapti = time.Now().Unix()
+	}
+
 	return &generant.Message{
-		SnapTime:    n.SnapTime,
+		SnapTime:    snapti,
 		PubTime:     pubti,
 		Source:      n.URL,
 		Body:        n.Body,
@@ -149,6 +161,7 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		Replys:      replys,
 		ViewType:    n.ViewType,
 		Version:     "0.1",
+		From:        "Netease News",
 	}, nil
 }
 
