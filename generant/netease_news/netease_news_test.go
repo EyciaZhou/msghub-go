@@ -3,6 +3,7 @@ package netease_news
 import (
 	//"encoding/json"
 	"testing"
+	"time"
 )
 
 func TestGetNews(t *testing.T) {
@@ -35,4 +36,5 @@ func TestGetNews(t *testing.T) {
 
 func TestStartCatch(t *testing.T) {
 	StartCatch()
+	time.Sleep(time.Minute)
 }

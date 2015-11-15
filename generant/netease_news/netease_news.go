@@ -341,7 +341,7 @@ func getNewsList(listId string, page int) ([]*generant.Message, error) {
 			content, err = getNormalNews(item)
 		}
 		if err != nil {
-			log.Warning("at ITEM%d: %d", i, err.Error())
+			log.Warning("at ITEM%d: %s", i, err.Error())
 			continue
 		}
 		result = append(result, content)
@@ -388,27 +388,28 @@ http://c.m.163.com/nc/article/B28K7NTL00031H2L/full.html
 */
 
 func catchOneTagOnce(tagid string, tag string, pagesOnce int) {
-	stmt, err := generant.GetStmtInsert()
-	if err != nil {
-		log.Error("Error when get STMT, ERROR:[%s]", err.Error())
-		return
-	}
-	defer stmt.Close()
+	log.Info("Start Catch TAG:[%s]", tag)
+
+	cnt := 0
 
 	for i := 0; i < pagesOnce; i++ {
+		log.Debug("Start Catch TAG:[%s], PAGA[%d]", tag, i)
 		news, err := getNewsList(tagid, i)
 		if err != nil {
 			log.Error("Error raisd when catch TAG[%s], PAGENO[%s], ERROR:[%s]", tag, i, err.Error())
 			continue
 		}
-		log.Debug("%d %d", i, len(news))
+		log.Debug("List Getted TAG:[%s], PAGE[%d]", tag, i)
 		for _, item := range news {
 			item.Type = tag
-			if _, err := item.InsertIntoSQL(stmt); err != nil {
+			if _, err := item.InsertIntoSQL(); err != nil {
 				log.Error("Error when insert into sql : ERROR:[%s]", err.Error())
+				continue
 			}
+			cnt++
 		}
 	}
+	log.Info("End Catch Tag [%d] News expected, [%d] News Catched", 20*pagesOnce, cnt)
 }
 
 func catchOneTagDaemon(tagid string, tag string, pagesOnce int, delay time.Duration) {

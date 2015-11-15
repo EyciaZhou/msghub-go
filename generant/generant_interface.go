@@ -2,11 +2,14 @@ package generant
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
+	"git.eycia.me/eycia/configparser"
+	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/op/go-logging"
+	"github.com/zbindenren/logrus_mail"
+	"os"
 )
-
-var log = logging.MustGetLogger("netease_news")
 
 type Generant interface {
 }
@@ -29,34 +32,191 @@ type Image struct {
 
 type Message struct {
 	ID          string   `json:"id"`
-	SnapTime    int64    `json:"snaptime"`
-	PubTime     int64    `json:"pubtime"`
-	Source      string   `json:"source"`
-	Body        string   `json:"body"`
-	Title       string   `json:"title"`
-	Subtitle    string   `json:"subtitle"`
-	CoverImg    string   `json:"coverimg"` //if not have this field shoud be ""
+	SnapTime    int64    `json:"snaptime"` //*
+	PubTime     int64    `json:"pubtime"`  //*
+	Source      string   `json:"source"`   //*
+	Body        string   `json:"body"`     //*
+	Title       string   `json:"title"`    //*
+	Subtitle    string   `json:"subtitle"` //*
+	CoverImg    string   `json:"coverimg"` //if not have this field shoud be "" //*
 	Images      []*Image `json:"images"`
 	ReplyNumber int      `json:"replynumber"`
 	Replys      []Reply  `json:"replys"`
-	ViewType    int      `json:"viewtype"`
+	ViewType    int      `json:"viewtype"` //*
 	Version     string   `json:"version"`
-	From        string   `json:"from"`
-	Type        string   `json:"type"`
+	From        string   `json:"from"` //*
+	Type        string   `json:"type"` //*
+	Priority    int      `json:"priority"`
 }
 
-func (m *Message) InsertIntoSQL(stmt *sql.Stmt) (sql.Result, error) {
-	return stmt.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, m.CoverImg, m.ViewType, m.From, m.Type)
+func (m *Message) InsertIntoSQL() (sql.Result, error) {
+	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, m.CoverImg, m.ViewType, m.From, m.Type)
+
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := res.LastInsertId()
+
+	//if not modified, call SELECT to find the id
+	if num, _ := res.RowsAffected(); num == 0 {
+		row := StmtSelectMidFromURL.QueryRow(m.Source)
+		err = row.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, img := range m.Images {
+		_, err := img.InsertIntoSQL(id)
+		if err != nil {
+			log.Errorf("Error raised when catch img of SOURCE[%s], URL is [%s] \n ERROR:[%s]", m.Source, img.URL, err.Error())
+		}
+	}
+
+	return res, nil
+}
+
+func isUrl(ur string) bool {
+	//TODO: judge the domain
+	return true
+}
+
+func (img *Image) InsertIntoQueue() (int64, error) {
+
+	url := img.URL
+
+	if isUrl(url) {
+		res, err := StmtInsertImgToQueue.Exec(url, url)
+
+		if err != nil {
+			log.WithField("url", url).Error("Error when exec InsertImgToQueue's STMT, REASON : " + err.Error())
+			return 0, err
+		}
+
+		rc, _ := res.RowsAffected()
+		if rc != 1 {
+			//duplicate
+			var pid int64
+			row := StmtSelectPidFromURL.QueryRow(url)
+			err = row.Scan(&pid)
+			if err != nil {
+				return 0, err
+			}
+			return pid, nil
+		}
+		//inserted
+		return res.LastInsertId()
+	}
+
+	return 0, ErrorNotInvaildURL
+}
+
+func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
+	pid, err := img.InsertIntoQueue()
+	if err != nil {
+		return nil, err
+	}
+	return StmtInsertRef.Exec(img.Ref, img.Desc, pid, mid)
 }
 
 var (
-	db *sql.DB
+	db                   *sql.DB
+	StmtInsert           *sql.Stmt
+	StmtInsertRef        *sql.Stmt
+	StmtInsertImgToQueue *sql.Stmt
+	StmtSelectPidFromURL *sql.Stmt
+	StmtSelectMidFromURL *sql.Stmt
+
+	ErrorNotInvaildURL = errors.New("url is not invaild")
 )
 
-func GetStmtInsert() (*sql.Stmt, error) {
-	return db.Prepare(
+func CornCatch() {
+
+}
+
+type Config struct {
+	MailApplicationName string `default:"Generant_Interface"`
+	MailSMTPAddress     string `default:"127.0.0.1"`
+	MailSMTPPort        int    `default:"25"`
+	MailFrom            string `default:"root@eycia.me"`
+	MailTo              string `default:"zhou.eycia@gmail.com"`
+
+	MailUsername string `default:"nomailusername"`
+	MailPassword string `default:"nomailpassword"`
+
+	QueueTableName  string `default:"pic_task_queue"`
+	PicRefTableName string `default:"picref"`
+	MsgTableName    string `default:"msg"`
+
+	DBAddress  string `default:"db.dianm.in"`
+	DBPort     string `default:"3306"`
+	DBName     string `default:"msghub"`
+	DBUsername string `default:"root"`
+	DBPassword string `default:"123456"`
+}
+
+var (
+	config Config
+)
+
+func loadConfig() {
+	var err error
+
+	//load
+	if len(os.Args) > 1 {
+		log.Info("Loading config from ", os.Args[1])
+		err = configparser.LoadConfDir(&config, os.Args[1])
+	}
+
+	if err != nil || len(os.Args) == 1 {
+		log.Info("Loading config use default values")
+		err = configparser.LoadConfDefault(&config)
+	}
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func init() {
+	loadConfig()
+
+	//process log's mail sending
+	/*
+		mailhook, err := logrus_mail.NewMailHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo)
+		if err == nil {
+			log.AddHook(mailhook)
+		} else {
+			log.Error("Can't Hook mail, ERROR:", err.Error())
+		}
+	*/
+	mailhook_auth, err := logrus_mail.NewMailAuthHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo,
+		config.MailUsername, config.MailPassword)
+
+	if err == nil {
+		log.AddHook(mailhook_auth)
+		log.Error("Don't Worry, just for send a email to test")
+	} else {
+		log.Error("Can't Hook mail, ERROR:", err.Error())
+	}
+
+	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
+	db, err = sql.Open("mysql", url)
+	if err != nil {
+		log.Error("Can't Connect DB REASON : " + err.Error())
+		return
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Error("Can't Connect DB REASON : " + err.Error())
+		return
+	}
+	log.Info("connected")
+
+	StmtInsert, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
-				msg (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Typ)
+				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Typ)
 			VALUES
 				(?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
@@ -66,28 +226,60 @@ func GetStmtInsert() (*sql.Stmt, error) {
 				Title = VALUES(Title),
 				SubTitle = VALUES(SubTitle),
 				CoverImg = VALUES(CoverImg),
-				ViewType = VALUES(ViewType)`)
-}
-
-func CornCatch() {
-
-}
-
-func init() {
-	logging.SetFormatter(logging.MustStringFormatter(
-		"%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}",
-	))
-	var err error
-	db, err = sql.Open("mysql", "root:123456@tcp(q.dianm.in:3306)/msghub")
+				ViewType = VALUES(ViewType)`, config.MsgTableName))
 	if err != nil {
-		log.Error(err.Error())
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		log.Error("Error when get STMT, ERROR:[%s]", err.Error())
+		return
 	}
 
-	err = db.Ping()
+	StmtInsertRef, err = db.Prepare(fmt.Sprintf(
+		`INSERT INTO
+				%s (Ref, Description, pid, mid)
+			VALUES
+				(?,?,?,?)
+			ON DUPLICATE KEY UPDATE
+				Ref = VALUES(Ref),
+				Description = VALUES(Description)`,
+		config.PicRefTableName))
 	if err != nil {
-		log.Error(err.Error())
-		panic(err.Error()) // proper error handling instead of panic in your app
+		panic(err)
+		return
 	}
-	log.Info("connected")
+
+	StmtInsertImgToQueue, err = db.Prepare(fmt.Sprintf(`
+	INSERT INTO
+			%s (url, status, owner)
+		SELECT
+				?, 0, 0
+			FROM DUAL
+			WHERE NOT EXISTS (SELECT 1 FROM pic_task_queue WHERE url=?);
+	`, config.QueueTableName))
+	/*
+		StmtInsertImgToQueue, err = db.Prepare(fmt.Sprintf(`
+		INSERT INTO
+				%s (url, status)
+			VALUES
+				(?,?);`, config.QueueTableName))*/
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	StmtSelectPidFromURL, err = db.Prepare(fmt.Sprintf(`
+	SELECT id FROM %s
+		WHERE url=?;
+	`, config.QueueTableName))
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	StmtSelectMidFromURL, err = db.Prepare(fmt.Sprintf(`
+	SELECT id FROM %s
+		WHERE SourceURL=?;
+	`, config.MsgTableName))
+	if err != nil {
+		panic(err)
+		return
+	}
 }

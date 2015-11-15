@@ -1,0 +1,17 @@
+{
+  "MailSMTPAddress": "smtp.gmail.com",
+  "MailSMTPPort": 587,
+  "MailFrom": "askzzb@gmail.com",
+  "MailTo": "zhou.eycia@gmail.com",
+  "MailUsername": "askzzb@gmail.com",
+  "MailPassword": "EbLL.424.chrome",
+  "QueueTableName": "pic_task_queue",
+  "PicRefTableName": "picref",
+  "MsgTableName": "msg",
+  "DBAddress": "db.dianm.in",
+  "DBPassword": "123456",
+  "DBPort": "3306",
+  "DBName": "msghub",
+  "DBUsername": "root"
+}
+

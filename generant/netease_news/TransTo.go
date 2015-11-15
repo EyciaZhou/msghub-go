@@ -68,7 +68,7 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 	var replys []generant.Reply
 	var imgs []*generant.Image
 
-	//progress reply
+	//process reply
 	for _, item := range n.Replys {
 		nReply, err := item.ToReply()
 		if err != nil {
@@ -78,7 +78,7 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		replys = append(replys, nReply)
 	}
 
-	//progress imgages
+	//process images
 	for _, item := range n.Images {
 		nImage, err := item.ToImage()
 		if err != nil {
@@ -111,6 +111,7 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		ViewType:    n.ViewType,
 		Version:     "0.1",
 		From:        "Netease News",
+		Priority:    n.Priority,
 	}, nil
 }
 
@@ -162,6 +163,7 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		ViewType:    n.ViewType,
 		Version:     "0.1",
 		From:        "Netease News",
+		Priority:    n.Priority,
 	}, nil
 }
 
