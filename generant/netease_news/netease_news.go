@@ -1,17 +1,16 @@
 package netease_news
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"git.eycia.me/eycia/msghub/generant"
 	"git.eycia.me/eycia/msghub/netTools"
-	"github.com/op/go-logging"
+//	"github.com/op/go-logging"
 	"strings"
 	"time"
 )
-
-var log = logging.MustGetLogger("netease_news")
 
 type NeteaseNewsChannel struct {
 }
@@ -325,23 +324,32 @@ func getNewsList(listId string, page int) ([]*generant.Message, error) {
 
 	var content *generant.Message
 
-	for i, item := range baseInfoList {
+	for _, item := range baseInfoList {
 		//judge skip type
 		if typ, hv := item["skipType"]; hv {
 			if skipTyp, can := typ.(string); !can {
-				err = errors.New(fmt.Sprint("have skiptype but type is not string , SKIPID[%T : %v]", typ, typ))
+				err = fmt.Errorf("have skiptype but type is not string , SKIPID[%T : %v]", typ, typ)
 			} else {
 				switch skipTyp {
 				case "photoset":
 					content, err = getPhotosetNews(item)
 				case "special":
+					//TODO
+					continue
+				default:
+					//TODO
+					continue
 				}
 			}
 		} else {
 			content, err = getNormalNews(item)
 		}
 		if err != nil {
-			log.Warning("at ITEM%d: %s", i, err.Error())
+			log.WithFields(log.Fields{
+				"time" : "getNewsList",
+				"error" : err.Error(),
+				"item" : item,
+			}).Warn("error when change map to struct")
 			continue
 		}
 		result = append(result, content)
@@ -387,34 +395,65 @@ http://c.m.163.com/nc/article/B28K7NTL00031H2L/full.html
 }
 */
 
-func catchOneTagOnce(tagid string, tag string, pagesOnce int) {
-	log.Info("Start Catch TAG:[%s]", tag)
+func catchOneTagOnce(tagid string, tag string, pagesOnce int, threadNum int) {
+	log.WithFields(log.Fields{
+		"tag" : tag,
+		"page num" : pagesOnce,
+		"THREAD" : threadNum,
+	}).Info("Start Catch")
 
 	cnt := 0
 
 	for i := 0; i < pagesOnce; i++ {
-		log.Debug("Start Catch TAG:[%s], PAGA[%d]", tag, i)
+		log.WithFields(log.Fields{
+			"tag" : tag,
+			"page no." : i,
+			"THREAD" : threadNum,
+		}).Info("Start Catch Page")
+
 		news, err := getNewsList(tagid, i)
 		if err != nil {
-			log.Error("Error raisd when catch TAG[%s], PAGENO[%s], ERROR:[%s]", tag, i, err.Error())
+			log.WithFields(log.Fields{
+				"tag" : tag,
+				"page no." : i,
+				"error" : err.Error(),
+				"THREAD" : threadNum,
+			}).Error("Errors when catch")
 			continue
 		}
-		log.Debug("List Getted TAG:[%s], PAGE[%d]", tag, i)
+		log.WithFields(log.Fields{
+			"tag" : tag,
+			"page no." : i,
+			"THREAD" : threadNum,
+		}).Info("Fetch Page ends")
+
 		for _, item := range news {
 			item.Type = tag
 			if _, err := item.InsertIntoSQL(); err != nil {
-				log.Error("Error when insert into sql : ERROR:[%s]", err.Error())
+
+				log.WithFields(log.Fields{
+					"tag" : tag,
+					"page no." : i,
+					"error" : err.Error(),
+					"THREAD" : threadNum,
+				}).Error("Errors when insert into sql")
+
 				continue
 			}
 			cnt++
 		}
 	}
-	log.Info("End Catch Tag [%d] News expected, [%d] News Catched", 20*pagesOnce, cnt)
+
+	log.WithFields(log.Fields{
+		"tag" : tag,
+		"THREAD" : threadNum,
+	}).Infof("End Catch, [%d] News expected, [%d] News Really Catched, Thread goes sleep", 20*pagesOnce, cnt)
+
 }
 
-func catchOneTagDaemon(tagid string, tag string, pagesOnce int, delay time.Duration) {
+func catchOneTagDaemon(tagid string, tag string, pagesOnce int, delay time.Duration, threadNum int) {
 	for {
-		catchOneTagOnce(tagid, tag, pagesOnce)
+		catchOneTagOnce(tagid, tag, pagesOnce, threadNum)
 		time.Sleep(delay)
 	}
 }
@@ -434,15 +473,13 @@ var (
 )
 
 func StartCatch() {
-	for _, configure := range configures {
-		go catchOneTagDaemon(configure.Tag, configure.Tagid, configure.PageOnce, configure.Delay)
+	for threadNum, configure := range configures {
+		go catchOneTagDaemon(configure.Tag, configure.Tagid, configure.PageOnce, configure.Delay, threadNum)
 		//time.Sleep(time.Minute)
 		time.Sleep(time.Second * 10)
 	}
 }
 
 func init() {
-	logging.SetFormatter(logging.MustStringFormatter(
-		"%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}",
-	))
+
 }

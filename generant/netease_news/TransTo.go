@@ -1,6 +1,7 @@
 package netease_news
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"git.eycia.me/eycia/msghub/generant"
 	"strconv"
 	"time"
@@ -27,7 +28,6 @@ func (r Reply) ToReply() (generant.Reply, error) {
 	length := len(r)
 	for i := 1; i <= length; i++ {
 		id := strconv.Itoa(i)
-		//log.Debug("TIME:[%v]", r[id].Time)
 		ti, _ := parseTime(r[id].Time)
 		/* only last floor have time
 		if e != nil {
@@ -72,7 +72,11 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 	for _, item := range n.Replys {
 		nReply, err := item.ToReply()
 		if err != nil {
-			log.Warning("error throwed when reply trans, REPLY:[%v], ERROR:[%s]", item, err.Error())
+			log.WithFields(log.Fields{
+				"time" : "fetch",
+				"reply" : item,
+				"error" : err.Error(),
+			}).Warning("error throwed when reply trans")
 			continue
 		}
 		replys = append(replys, nReply)
@@ -82,7 +86,11 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 	for _, item := range n.Images {
 		nImage, err := item.ToImage()
 		if err != nil {
-			log.Warning("error throwed when image trans, IMAGE:[%v], ERROR:[%s]", item, err.Error())
+			log.WithFields(log.Fields{
+				"time" : "fetch",
+				"image" : item,
+				"error" : err.Error(),
+			}).Warning("error throwed when image trans")
 			continue
 		}
 		imgs = append(imgs, nImage)
@@ -123,7 +131,11 @@ func (n *News) ToMsg() (*generant.Message, error) {
 	for _, item := range n.Replys {
 		nReply, err := item.ToReply()
 		if err != nil {
-			log.Warning("error throwed when reply trans, REPLY:[%v], ERROR:[%s]", item, err.Error())
+			log.WithFields(log.Fields{
+				"time" : "fetch",
+				"reply" : item,
+				"error" : err.Error(),
+			}).Warning("error throwed when reply trans")
 			continue
 		}
 		replys = append(replys, nReply)
@@ -133,9 +145,14 @@ func (n *News) ToMsg() (*generant.Message, error) {
 	for _, item := range n.Images {
 		nImage, err := item.ToImage()
 		if err != nil {
-			log.Warning("error throwed when image trans, IMAGE:[%v], ERROR:[%s]", item, err.Error())
+			log.WithFields(log.Fields{
+				"time" : "fetch",
+				"image" : item,
+				"error" : err.Error(),
+			}).Warning("error throwed when image trans")
 			continue
 		}
+
 		imgs = append(imgs, nImage)
 	}
 

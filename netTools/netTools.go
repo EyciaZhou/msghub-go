@@ -1,14 +1,11 @@
 package netTools
 
 import (
-	"github.com/op/go-logging"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
 )
-
-var log = logging.MustGetLogger("nettools")
 
 func GetWithoutAnyThing(url string) ([]byte, error) {
 	resp, err := http.Get(url)
@@ -35,8 +32,6 @@ func GetByAndroid(url string) ([]byte, error) {
 		resp, err = client.Do(req)
 		if err == nil {
 			break
-		} else {
-			log.Debug("try times [%d] errors, [%s]", try, err.Error())
 		}
 	}
 	if err != nil {
@@ -67,9 +62,3 @@ func GetReturnsReader(url string) (io.ReadCloser, error) {
 var (
 	Get = GetByAndroid
 )
-
-func init() {
-	logging.SetFormatter(logging.MustStringFormatter(
-		"%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}",
-	))
-}
