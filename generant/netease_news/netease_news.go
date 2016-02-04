@@ -428,7 +428,7 @@ func catchOneTagOnce(tagid string, tag string, pagesOnce int, threadNum int) {
 		}).Info("Fetch Page ends")
 
 		for _, item := range news {
-			item.Type = tag
+			item.Tag = tag
 			if _, err := item.InsertIntoSQL(); err != nil {
 
 				log.WithFields(log.Fields{

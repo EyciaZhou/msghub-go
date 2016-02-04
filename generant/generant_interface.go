@@ -31,7 +31,7 @@ type Image struct {
 }
 
 type Message struct {
-	ID          string   `json:"id"`
+	//ID          string   `json:"id"`
 	SnapTime    int64    `json:"snaptime"` //*
 	PubTime     int64    `json:"pubtime"`  //*
 	Source      string   `json:"source"`   //*
@@ -45,12 +45,21 @@ type Message struct {
 	ViewType    int      `json:"viewtype"` //*
 	Version     string   `json:"version"`
 	From        string   `json:"from"` //*
-	Type        string   `json:"type"` //*
+	Tag         string   `json:"tag"` //*
 	Priority    int      `json:"priority"`
 }
 
 func (m *Message) InsertIntoSQL() (sql.Result, error) {
-	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, m.CoverImg, m.ViewType, m.From, m.Type)
+	//insert cover img
+
+	coverImgId, err := insertImgUrlIntoQueue(m.CoverImg)
+
+	if err != nil {
+		return nil,err
+	}
+
+
+	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.From, m.Tag)
 
 	if err != nil {
 		return nil, err
@@ -82,10 +91,7 @@ func isUrl(ur string) bool {
 	return true
 }
 
-func (img *Image) InsertIntoQueue() (int64, error) {
-
-	url := img.URL
-
+func insertImgUrlIntoQueue(url string) (int64, error) {
 	if isUrl(url) {
 		res, err := StmtInsertImgToQueue.Exec(url, url)
 
@@ -110,6 +116,10 @@ func (img *Image) InsertIntoQueue() (int64, error) {
 	}
 
 	return 0, ErrorNotInvaildURL
+}
+
+func (img *Image) InsertIntoQueue() (int64, error) {
+	return insertImgUrlIntoQueue(img.URL)
 }
 
 func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
@@ -149,11 +159,11 @@ type Config struct {
 	PicRefTableName string `default:"picref"`
 	MsgTableName    string `default:"msg"`
 
-	DBAddress  string `default:"db.dianm.in"`
+	DBAddress  string `default:"127.0.0.1"`
 	DBPort     string `default:"3306"`
 	DBName     string `default:"msghub"`
 	DBUsername string `default:"root"`
-	DBPassword string `default:"123456"`
+	DBPassword string `default:"fmttm233"`
 }
 
 var (
@@ -216,7 +226,7 @@ func init() {
 
 	StmtInsert, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
-				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Typ)
+				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Tag)
 			VALUES
 				(?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
@@ -252,8 +262,8 @@ func init() {
 		SELECT
 				?, 0, 0
 			FROM DUAL
-			WHERE NOT EXISTS (SELECT 1 FROM pic_task_queue WHERE url=?);
-	`, config.QueueTableName))
+			WHERE NOT EXISTS (SELECT 1 FROM %s WHERE url=?);
+	`, config.QueueTableName, config.QueueTableName))
 	/*
 		StmtInsertImgToQueue, err = db.Prepare(fmt.Sprintf(`
 		INSERT INTO
