@@ -21,7 +21,7 @@ func parseTime(ts string) (int64, error) {
 	return ti.Unix(), nil
 }
 
-//if any floor errors, it returns nil and error
+//ToReply: if any floor errors, it returns nil and error
 func (r Reply) ToReply() (generant.Reply, error) {
 	var reply generant.Reply
 

@@ -11,7 +11,16 @@ import (
 	"os"
 )
 
+type Plugin func(args ...interface{}) (Generant, error)
+
 type Generant interface {
+	Catch()
+
+	//Stop: maybe could continue this round catch, and insert into mysql
+	Stop()
+
+	//ForceStop: stop immediately, drop this round, only do some clean etc
+	ForceStop()
 }
 
 type ReplyFloor struct {
@@ -45,21 +54,25 @@ type Message struct {
 	ViewType    int      `json:"viewtype"` //*
 	Version     string   `json:"version"`
 	From        string   `json:"from"` //*
-	Tag         string   `json:"tag"` //*
+	Channel     string   `json:"tag"`  //*
 	Priority    int      `json:"priority"`
 }
 
 func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	//insert cover img
+	var coverImgId interface{}
 
-	coverImgId, err := insertImgUrlIntoQueue(m.CoverImg)
-
-	if err != nil {
-		return nil,err
+	if m.CoverImg != "" {
+		var err error
+		coverImgId, err = insertImgUrlIntoQueue(m.CoverImg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		coverImgId = nil
 	}
 
-
-	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.From, m.Tag)
+	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.From, m.Channel)
 
 	if err != nil {
 		return nil, err
@@ -141,10 +154,6 @@ var (
 	ErrorNotInvaildURL = errors.New("url is not invaild")
 )
 
-func CornCatch() {
-
-}
-
 type Config struct {
 	MailApplicationName string `default:"Generant_Interface"`
 	MailSMTPAddress     string `default:"127.0.0.1"`
@@ -176,7 +185,7 @@ func loadConfig() {
 	//load
 	if len(os.Args) > 1 {
 		log.Info("Loading config from ", os.Args[1])
-		err = configparser.LoadConfDir(&config, os.Args[1])
+		err = configparser.LoadConfPath(&config, os.Args[1])
 	}
 
 	if err != nil || len(os.Args) == 1 {

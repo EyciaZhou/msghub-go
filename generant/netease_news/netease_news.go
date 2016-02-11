@@ -7,13 +7,8 @@ import (
 	"fmt"
 	"git.eycia.me/eycia/msghub/generant"
 	"git.eycia.me/eycia/msghub/netTools"
-//	"github.com/op/go-logging"
 	"strings"
-	"time"
 )
-
-type NeteaseNewsChannel struct {
-}
 
 /*
 {
@@ -394,91 +389,6 @@ http://c.m.163.com/nc/article/B28K7NTL00031H2L/full.html
 	}
 }
 */
-
-func catchOneTagOnce(tagid string, tag string, pagesOnce int, threadNum int) {
-	log.WithFields(log.Fields{
-		"tag" : tag,
-		"page num" : pagesOnce,
-		"THREAD" : threadNum,
-	}).Info("Start Catch")
-
-	cnt := 0
-
-	for i := 0; i < pagesOnce; i++ {
-		log.WithFields(log.Fields{
-			"tag" : tag,
-			"page no." : i,
-			"THREAD" : threadNum,
-		}).Info("Start Catch Page")
-
-		news, err := getNewsList(tagid, i)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"tag" : tag,
-				"page no." : i,
-				"error" : err.Error(),
-				"THREAD" : threadNum,
-			}).Error("Errors when catch")
-			continue
-		}
-		log.WithFields(log.Fields{
-			"tag" : tag,
-			"page no." : i,
-			"THREAD" : threadNum,
-		}).Info("Fetch Page ends")
-
-		for _, item := range news {
-			item.Tag = tag
-			if _, err := item.InsertIntoSQL(); err != nil {
-
-				log.WithFields(log.Fields{
-					"tag" : tag,
-					"page no." : i,
-					"error" : err.Error(),
-					"THREAD" : threadNum,
-				}).Error("Errors when insert into sql")
-
-				continue
-			}
-			cnt++
-		}
-	}
-
-	log.WithFields(log.Fields{
-		"tag" : tag,
-		"THREAD" : threadNum,
-	}).Infof("End Catch, [%d] News expected, [%d] News Really Catched, Thread goes sleep", 20*pagesOnce, cnt)
-
-}
-
-func catchOneTagDaemon(tagid string, tag string, pagesOnce int, delay time.Duration, threadNum int) {
-	for {
-		catchOneTagOnce(tagid, tag, pagesOnce, threadNum)
-		time.Sleep(delay)
-	}
-}
-
-type NeteaseNewsCatchConfigure struct {
-	Tag      string
-	Tagid    string
-	PageOnce int
-	Delay    time.Duration
-}
-
-var (
-	configures []NeteaseNewsCatchConfigure = []NeteaseNewsCatchConfigure{
-		{KEJI_ID, "科技", 4, time.Minute * 10},
-		{TOUTIAO_ID, "头条", 4, time.Minute * 10},
-	}
-)
-
-func StartCatch() {
-	for threadNum, configure := range configures {
-		go catchOneTagDaemon(configure.Tag, configure.Tagid, configure.PageOnce, configure.Delay, threadNum)
-		//time.Sleep(time.Minute)
-		time.Sleep(time.Second * 10)
-	}
-}
 
 func init() {
 
