@@ -4,14 +4,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"git.eycia.me/eycia/configparser"
+	"github.com/EyciaZhou/configparser"
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/zbindenren/logrus_mail"
 	"os"
+	"sync"
+	"path"
+	"io/ioutil"
+	"time"
 )
 
-type Plugin func(args ...interface{}) (Generant, error)
+type LoadConf func(raw []byte) (Generant, error)
 
 type Generant interface {
 	Catch()
@@ -21,6 +25,20 @@ type Generant interface {
 
 	//ForceStop: stop immediately, drop this round, only do some clean etc
 	ForceStop()
+}
+
+var (
+	pluginsMu sync.Mutex
+	regedPlugins = make(map[string]LoadConf)
+
+	generants []Generant
+)
+
+func Register(name string, fLoadConf LoadConf) {
+	pluginsMu.Lock()
+	defer pluginsMu.Unlock()
+
+	regedPlugins[name] = fLoadConf
 }
 
 type ReplyFloor struct {
@@ -173,16 +191,23 @@ type Config struct {
 	DBName     string `default:"msghub"`
 	DBUsername string `default:"root"`
 	DBPassword string `default:"fmttm233"`
+
+	ConfDir string
+	ConfFileNames []string
+	ConfPluginNames []string
 }
 
 var (
 	config Config
 )
 
-func loadConfig() {
+func loadConfig() error {
+	pluginsMu.Lock()
+	defer pluginsMu.Unlock()
+
 	var err error
 
-	//load
+	//load self first
 	if len(os.Args) > 1 {
 		log.Info("Loading config from ", os.Args[1])
 		err = configparser.LoadConfPath(&config, os.Args[1])
@@ -193,13 +218,48 @@ func loadConfig() {
 		err = configparser.LoadConfDefault(&config)
 	}
 
+	return err
+}
+
+func loadPluginConfig() error {
+	//
+	if generants == nil || (generants != nil && len(generants) > 0) {
+		return errors.New("can't load config twice")
+	}
+
+	if len(config.ConfFileNames) != len(config.ConfPluginNames) {
+		return errors.New("the length of ConfFileNames and ConfPluginNames not same")
+	}
+
+	generants = make([]Generant, len(config.ConfPluginNames))
+
+	config.ConfDir = path.Clean(config.ConfDir)
+
+	for i, fn := range config.ConfFileNames {
+		bs, err := ioutil.ReadFile(config.ConfDir+"/"+fn)
+		if err != nil {
+			return err
+		}
+
+		if plugin, hv := regedPlugins[config.ConfPluginNames[i]]; !hv {
+			return errors.New("Doesn't registed Plugin : " + config.ConfPluginNames[i])
+		} else {
+			generants[i], err = plugin(bs)
+			if err != nil {
+				return fmt.Errorf("Error when load %d th plugin : %s", i+1, err.Error())
+			}
+		}
+	}
+
+	return nil
+}
+
+func Init() {
+	log.Info("Start Load Config")
+	err := loadConfig()
 	if err != nil {
 		panic(err)
 	}
-}
-
-func init() {
-	loadConfig()
 
 	//process log's mail sending
 	/*
@@ -210,6 +270,8 @@ func init() {
 			log.Error("Can't Hook mail, ERROR:", err.Error())
 		}
 	*/
+
+	log.Info("Start Bind Mail Hook")
 	mailhook_auth, err := logrus_mail.NewMailAuthHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo,
 		config.MailUsername, config.MailPassword)
 
@@ -217,22 +279,24 @@ func init() {
 		log.AddHook(mailhook_auth)
 		log.Error("Don't Worry, just for send a email to test")
 	} else {
-		log.Error("Can't Hook mail, ERROR:", err.Error())
+		log.Panic("Can't Hook mail, ERROR:", err.Error())
 	}
 
+	log.Info("Start Connect mysql")
 	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
 	db, err = sql.Open("mysql", url)
 	if err != nil {
-		log.Error("Can't Connect DB REASON : " + err.Error())
+		log.Panic("Can't Connect DB REASON : " + err.Error())
 		return
 	}
 	err = db.Ping()
 	if err != nil {
-		log.Error("Can't Connect DB REASON : " + err.Error())
+		log.Panic("Can't Connect DB REASON : " + err.Error())
 		return
 	}
 	log.Info("connected")
 
+	log.Info("Start prepare stmt")
 	StmtInsert, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
 				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Tag)
@@ -247,7 +311,7 @@ func init() {
 				CoverImg = VALUES(CoverImg),
 				ViewType = VALUES(ViewType)`, config.MsgTableName))
 	if err != nil {
-		log.Error("Error when get STMT, ERROR:[%s]", err.Error())
+		log.Panic(err.Error())
 		return
 	}
 
@@ -261,7 +325,7 @@ func init() {
 				Description = VALUES(Description)`,
 		config.PicRefTableName))
 	if err != nil {
-		panic(err)
+		log.Panic(err.Error())
 		return
 	}
 
@@ -280,7 +344,7 @@ func init() {
 			VALUES
 				(?,?);`, config.QueueTableName))*/
 	if err != nil {
-		panic(err)
+		log.Panic(err.Error())
 		return
 	}
 
@@ -289,7 +353,7 @@ func init() {
 		WHERE url=?;
 	`, config.QueueTableName))
 	if err != nil {
-		panic(err)
+		log.Panic(err.Error())
 		return
 	}
 
@@ -298,7 +362,22 @@ func init() {
 		WHERE SourceURL=?;
 	`, config.MsgTableName))
 	if err != nil {
-		panic(err)
+		log.Panic(err.Error())
 		return
 	}
+
+
+	log.Info("Start load plugins's config")
+	err = loadPluginConfig()
+	if err != nil {
+		log.Panic(err.Error())
+	}
+
+	log.Info("Start fire plugins")
+	for _, gen := range generants {
+		go gen.Catch()
+		time.Sleep(10*time.Second)
+	}
+
+	log.Info("Init finished")
 }

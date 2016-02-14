@@ -3,44 +3,7 @@ package netease_news
 import (
 	log "github.com/Sirupsen/logrus"
 	"time"
-	"errors"
 )
-
-type NeteaseNewsCatchConfigure struct {
-	NeteaseNewsChannel
-	PagesOneTime		int
-	DelayBetweenPage	time.Duration
-	DelayBetweenEachCatchRound time.Duration
-
-	quit chan int
-}
-
-func NewDefaultNeteaseNewsCatchConfigure(channelName string) (*NeteaseNewsCatchConfigure, error) {
-	if hv, _ := channelsDefault[channelName]; !hv {
-		return nil, errors.New("no such channel")
-	}
-	channelInfo := channelsDefault[channelName]
-	return &NeteaseNewsCatchConfigure{
-		*channelInfo,
-		2,
-		time.Second * 10,
-		time.Minute * 10,
-
-		make(chan int),
-	}
-}
-
-func NewNeteaseNewsCatchConfigure(chann NeteaseNewsCatchConfigure, pagesOneTime int,
-					delayBetweenPage, delayBetweenEachCatchRound time.Duration) {
-	return &NeteaseNewsCatchConfigure{
-		chann,
-		pagesOneTime,
-		delayBetweenPage,
-		delayBetweenEachCatchRound,
-
-		make(chan int),
-	}
-}
 
 func (conf *NeteaseNewsCatchConfigure)catchOneTime() {
 	log.WithFields(log.Fields{

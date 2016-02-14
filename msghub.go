@@ -1,9 +1,10 @@
 package main
 
 import (
-	"git.eycia.me/eycia/msghub/generant/netease_news"
+	_ "git.eycia.me/eycia/msghub/generant/netease_news"
+	"git.eycia.me/eycia/msghub/generant"
 )
 
 func main() {
-	netease_news.StartCatch()
+	generant.Init()
 }

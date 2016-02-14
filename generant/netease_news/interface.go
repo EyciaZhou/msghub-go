@@ -3,7 +3,52 @@ package netease_news
 import (
 	"reflect"
 	"errors"
+	"time"
+	"git.eycia.me/eycia/msghub/generant"
+	"encoding/json"
 )
+
+type NeteaseNewsCatchConfigure struct {
+	NeteaseNewsChannel
+	PagesOneTime		int
+	DelayBetweenPage	time.Duration
+	DelayBetweenEachCatchRound time.Duration
+
+	quit chan int
+}
+
+func LoadConf(raw []byte) (generant.Generant, error) {
+	var cf map[string]interface{}
+
+	json.Unmarshal(raw, &cf)
+}
+
+func NewDefaultNeteaseNewsCatchConfigure(channelName string) (*NeteaseNewsCatchConfigure, error) {
+	if _, hv := channelsDefault[channelName]; !hv {
+		return nil, errors.New("no such channel")
+	}
+	channelInfo := channelsDefault[channelName]
+	return &NeteaseNewsCatchConfigure{
+		*channelInfo,
+		2,
+		time.Second * 10,
+		time.Minute * 10,
+
+		make(chan int),
+	}, nil
+}
+
+func NewNeteaseNewsCatchConfigure(chann NeteaseNewsChannel, pagesOneTime int,
+delayBetweenPage, delayBetweenEachCatchRound time.Duration) (*NeteaseNewsCatchConfigure, error) {
+	return &NeteaseNewsCatchConfigure{
+		chann,
+		pagesOneTime,
+		delayBetweenPage,
+		delayBetweenEachCatchRound,
+
+		make(chan int),
+	}, nil
+}
 
 /*
 LoadConfigAndNew:
@@ -18,13 +63,13 @@ func NewNeteaseNewsGenerant(args ...interface{}) (*NeteaseNewsGenerant, error) {
 
 	if len(args) == 1 {
 		if reflect.TypeOf(args[0]) == reflect.SliceOf(typeOfConfig) {
-			return NeteaseNewsCatchConfigure{
+			return &NeteaseNewsGenerant{
 				args[0].([]*NeteaseNewsCatchConfigure),
 			}, nil
 		}
 	}
 
-	configs := make(NeteaseNewsCatchConfigure, len(args))
+	configs := make([]*NeteaseNewsCatchConfigure, len(args))
 
 	for i := 0; i < len(args); i++ {
 		if reflect.TypeOf(args[i]) != typeOfConfig {
@@ -33,7 +78,7 @@ func NewNeteaseNewsGenerant(args ...interface{}) (*NeteaseNewsGenerant, error) {
 		configs[i] = args[i].(*NeteaseNewsCatchConfigure)
 	}
 
-	return NeteaseNewsCatchConfigure{
+	return &NeteaseNewsGenerant{
 		configs[:],
 	}, nil
 }
@@ -56,4 +101,8 @@ func (n *NeteaseNewsGenerant) Stop() {
 
 func (n *NeteaseNewsGenerant) ForceStop() {
 	n.Stop()
+}
+
+func init() {
+	generant.Register("NeteaseNews", generant.LoadConf(LoadConf))
 }

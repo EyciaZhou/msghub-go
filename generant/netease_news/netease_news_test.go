@@ -35,6 +35,5 @@ func TestGetNews(t *testing.T) {
 }
 
 func TestStartCatch(t *testing.T) {
-	StartCatch()
 	time.Sleep(time.Minute)
 }
