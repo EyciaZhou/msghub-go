@@ -70,7 +70,7 @@ func contentURL(id string) string {
 	return fmt.Sprintf("http://c.m.163.com/nc/article/%s/full.html", id)
 }
 
-func ReplyURL(id string, boardId string) string {
+func replyURL(id string, boardId string) string {
 	return fmt.Sprintf("http://comment.api.163.com/api/jsonp/post/list/hot/%s/%s/0/20/20/0/0", boardId, id)
 }
 
@@ -96,7 +96,7 @@ func getNewsContent(id string) (*News, error) {
 }
 
 func getNewsReply(id string, boardId string) ([]Reply, error) {
-	url := ReplyURL(id, boardId)
+	url := replyURL(id, boardId)
 	newsReplyPain, err := netTools.Get(url)
 	if err != nil {
 		return nil, err

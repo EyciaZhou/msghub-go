@@ -8,7 +8,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/zbindenren/logrus_mail"
-	"os"
 	"sync"
 	"path"
 	"io/ioutil"
@@ -173,6 +172,7 @@ var (
 )
 
 type Config struct {
+	MailEnabled bool `default:"false"`
 	MailApplicationName string `default:"Generant_Interface"`
 	MailSMTPAddress     string `default:"127.0.0.1"`
 	MailSMTPPort        int    `default:"25"`
@@ -208,6 +208,7 @@ func loadConfig() error {
 	var err error
 
 	//load self first
+	/*
 	if len(os.Args) > 1 {
 		log.Info("Loading config from ", os.Args[1])
 		err = configparser.LoadConfPath(&config, os.Args[1])
@@ -217,13 +218,18 @@ func loadConfig() error {
 		log.Info("Loading config use default values")
 		err = configparser.LoadConfDefault(&config)
 	}
+	*/
+
+	configparser.AutoLoadConfig("generant", &config)
+	//configparser.LoadConfFromFlag(&config)
+	configparser.ToJson(&config)
 
 	return err
 }
 
 func loadPluginConfig() error {
 	//
-	if generants == nil || (generants != nil && len(generants) > 0) {
+	if generants != nil && len(generants) > 0 {
 		return errors.New("can't load config twice")
 	}
 
@@ -235,7 +241,10 @@ func loadPluginConfig() error {
 
 	config.ConfDir = path.Clean(config.ConfDir)
 
+	log.Infof("%d plugin configs to load", len(config.ConfFileNames))
+
 	for i, fn := range config.ConfFileNames {
+		log.Infof("[%d/%d]...", i+1, len(config.ConfFileNames))
 		bs, err := ioutil.ReadFile(config.ConfDir+"/"+fn)
 		if err != nil {
 			return err
@@ -271,15 +280,17 @@ func Init() {
 		}
 	*/
 
-	log.Info("Start Bind Mail Hook")
-	mailhook_auth, err := logrus_mail.NewMailAuthHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo,
-		config.MailUsername, config.MailPassword)
+	if config.MailEnabled {
+		log.Info("Start Bind Mail Hook")
+		mailhook_auth, err := logrus_mail.NewMailAuthHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo,
+			config.MailUsername, config.MailPassword)
 
-	if err == nil {
-		log.AddHook(mailhook_auth)
-		log.Error("Don't Worry, just for send a email to test")
-	} else {
-		log.Panic("Can't Hook mail, ERROR:", err.Error())
+		if err == nil {
+			log.AddHook(mailhook_auth)
+			log.Error("Don't Worry, just for send a email to test")
+		} else {
+			log.Panic("Can't Hook mail, ERROR:", err.Error())
+		}
 	}
 
 	log.Info("Start Connect mysql")
@@ -373,9 +384,11 @@ func Init() {
 		log.Panic(err.Error())
 	}
 
-	log.Info("Start fire plugins")
-	for _, gen := range generants {
+	log.Infof("Start fire plugins, %d plugins to fire", len(generants))
+	for i, gen := range generants {
+		log.Infof("[%d/%d]...", i+1, len(generants))
 		go gen.Catch()
+		log.Info("fired and start delay")
 		time.Sleep(10*time.Second)
 	}
 

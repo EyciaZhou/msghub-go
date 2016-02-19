@@ -7,6 +7,7 @@ import (
 	"git.eycia.me/eycia/msghub/generant"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 )
 
 type NeteaseNewsCatchConfigure struct {
@@ -37,6 +38,21 @@ func mustInt64Default(m map[string]interface{}, key string, defau int64) (int64)
 	return defau
 }
 
+func mustDurationDefault(m map[string]interface{}, key string, defau time.Duration) time.Duration {
+	if va, hv := m[key]; hv {
+		v, ok := va.(string)
+		if !ok {
+			return defau
+		}
+		psd, err := time.ParseDuration(v)
+		if err != nil {
+			return defau
+		}
+		return psd
+	}
+	return defau
+}
+
 func loadConfigure(cf map[string]interface{}) (*NeteaseNewsCatchConfigure, error) {
 	if _default, hv := cf["default"]; hv {
 		if _def, ok := _default.(bool); ok {
@@ -53,36 +69,37 @@ func loadConfigure(cf map[string]interface{}) (*NeteaseNewsCatchConfigure, error
 	}
 
 	pagesOneTime := int(mustInt64Default(cf, "pagesOneTime", 2))
-	delayBetweenPage := time.Duration(mustInt64Default(cf, "delayBetweenPage", int64(time.Second*10)))
-	delayBetweenEachCatchRound := time.Duration(mustInt64Default(cf, "delayBetweenEachCatchRound", int64(time.Minute*10)))
+
+	delayBetweenPage := mustDurationDefault(cf, "delayBetweenPage", time.Second*10)
+	delayBetweenCatchRound := mustDurationDefault(cf, "delayBetweenCatchRound", time.Minute*10)
 
 	if chanName, hv := mustString(cf, "channelName"); !hv {
 		hv := true;
 
-		name, h := mustString(cf, "Name")
+		name, h := mustString(cf, "name")
 		hv = hv && h
 
-		url, h := mustString(cf, "URL")
+		url, h := mustString(cf, "url")
 		hv = hv && h
 
-		id, h := mustString(cf, "ID")
+		id, h := mustString(cf, "id")
 		hv = hv && h
 
 		if !hv {
-			return nil, errors.New("channelName have wrong type, or one or some of [Name, URL, ID] not exist in config file or the type isn't string")
+			return nil, errors.New("channelName have wrong type, or one or some of [name, url, id] not exist in config file or the type isn't string")
 		}
 
 		return NewNeteaseNewsCatchConfigure(
 			NeteaseNewsChannel{
 				name, url, id,
-			} ,pagesOneTime, delayBetweenPage, delayBetweenEachCatchRound,
+			} ,pagesOneTime, delayBetweenPage, delayBetweenCatchRound,
 		)
 	} else {
 		if cha, hv := channelsDefault[chanName]; !hv {
 			return nil, errors.New("use builtin channel but no such channel")
 		} else {
 			return NewNeteaseNewsCatchConfigure(
-				*cha, pagesOneTime, delayBetweenPage, delayBetweenEachCatchRound,
+				*cha, pagesOneTime, delayBetweenPage, delayBetweenCatchRound,
 			)
 		}
 	}
@@ -102,10 +119,12 @@ func LoadGenerant(raw []byte) (generant.Generant, error) {
 	for i, v := range cf {
 		conf, e := loadConfigure(v)
 		if e != nil {
-			return nil, fmt.Errorf("Netease load config error at item %d: " + err.Error(), i+1)
+			return nil, fmt.Errorf("Netease load config error at item %d: " + e.Error(), i+1)
 		}
 		configs[i] = conf
 	}
+
+	log.WithField("Plugin", "Netease News")
 
 	return &NeteaseNewsGenerant{
 		configs[:],

@@ -63,6 +63,7 @@ func (conf *NeteaseNewsCatchConfigure)catchOneTime() {
 }
 
 func (conf *NeteaseNewsCatchConfigure)CatchDaemon() {
+	conf.catchOneTime()
 	for {
 		select {
 		case <-time.After(conf.DelayBetweenEachCatchRound) :

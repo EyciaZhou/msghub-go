@@ -18,7 +18,7 @@ func GetWithoutAnyThing(url string) ([]byte, error) {
 
 var (
 	client = &http.Client{
-		Timeout: time.Duration(15 * time.Second),
+		Timeout: time.Duration(30 * time.Second),
 	}
 )
 
