@@ -1,7 +1,6 @@
 package netease_news
 
 import (
-	"reflect"
 	"errors"
 	"time"
 	"git.eycia.me/eycia/msghub/generant"
@@ -9,15 +8,6 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 )
-
-type NeteaseNewsCatchConfigure struct {
-	NeteaseNewsChannel
-	PagesOneTime		int
-	DelayBetweenPage	time.Duration
-	DelayBetweenEachCatchRound time.Duration
-
-	quit chan int
-}
 
 func mustString(m map[string]interface{}, key string) (string, bool) {
 	if va, hv := m[key]; hv {
@@ -53,14 +43,37 @@ func mustDurationDefault(m map[string]interface{}, key string, defau time.Durati
 	return defau
 }
 
-func loadConfigure(cf map[string]interface{}) (*NeteaseNewsCatchConfigure, error) {
+func loadConfigure(cf map[string]interface{}) (NeteaseNewsConfigure, error) {
+	if _typ, hv := cf["type"]; hv {
+		if _type, ok := _typ.(string); ok {
+			if _type == "special" {
+				return loadTopicConfigure(cf)
+			}
+		}
+	}
+
+	return loadChannelConfigure(cf)
+}
+
+func loadTopicConfigure(cf map[string]interface{}) (*NeteaseNewsTopicConfigure, error) {
+	tid, can := mustString(cf, "topicId")
+	if !can {
+		return nil, errors.New("missing topicId field")
+	}
+	delayBetweenCatchRound := mustDurationDefault(cf, "delayBetweenCatchRound", time.Minute*30)
+
+	return NewNeteaseNewsTopicConfigure(tid, delayBetweenCatchRound)
+
+}
+
+func loadChannelConfigure(cf map[string]interface{}) (*NeteaseNewsChannelConfigure, error) {
 	if _default, hv := cf["default"]; hv {
 		if _def, ok := _default.(bool); ok {
 			if _def {
 				if chanName, hv := mustString(cf, "channelName"); !hv {
 					return nil, errors.New("use default configure but no channel name[fiele ChannelName] or type isn't string")
 				} else {
-					return NewDefaultNeteaseNewsCatchConfigure(chanName)
+					return NewDefaultNeteaseNewsChannelConfigure(chanName)
 				}
 			}
 		} else {
@@ -71,7 +84,7 @@ func loadConfigure(cf map[string]interface{}) (*NeteaseNewsCatchConfigure, error
 	pagesOneTime := int(mustInt64Default(cf, "pagesOneTime", 2))
 
 	delayBetweenPage := mustDurationDefault(cf, "delayBetweenPage", time.Second*10)
-	delayBetweenCatchRound := mustDurationDefault(cf, "delayBetweenCatchRound", time.Minute*10)
+	delayBetweenCatchRound := mustDurationDefault(cf, "delayBetweenCatchRound", time.Minute*30)
 
 	if chanName, hv := mustString(cf, "channelName"); !hv {
 		hv := true;
@@ -114,7 +127,7 @@ func LoadGenerant(raw []byte) (generant.Generant, error) {
 		return nil, errors.New("Netease load config error: " + err.Error())
 	}
 
-	configs := make([]*NeteaseNewsCatchConfigure, len(cf))
+	configs := make([]NeteaseNewsConfigure, len(cf))
 
 	for i, v := range cf {
 		conf, e := loadConfigure(v)
@@ -131,37 +144,11 @@ func LoadGenerant(raw []byte) (generant.Generant, error) {
 	}, nil
 }
 
-func NewDefaultNeteaseNewsCatchConfigure(channelName string) (*NeteaseNewsCatchConfigure, error) {
-	if _, hv := channelsDefault[channelName]; !hv {
-		return nil, errors.New("no such channel")
-	}
-	channelInfo := channelsDefault[channelName]
-	return &NeteaseNewsCatchConfigure{
-		*channelInfo,
-		2,
-		time.Second * 10,
-		time.Minute * 10,
-
-		make(chan int),
-	}, nil
-}
-
-func NewNeteaseNewsCatchConfigure(chann NeteaseNewsChannel, pagesOneTime int,
-delayBetweenPage, delayBetweenEachCatchRound time.Duration) (*NeteaseNewsCatchConfigure, error) {
-	return &NeteaseNewsCatchConfigure{
-		chann,
-		pagesOneTime,
-		delayBetweenPage,
-		delayBetweenEachCatchRound,
-
-		make(chan int),
-	}, nil
-}
-
 /*
 LoadConfigAndNew:
 	args should be some of *NeteaseNewsCatchConfigure, or only contain a slice of *NeteaseNewsCatchConfigure
  */
+/*
 func NewNeteaseNewsGenerant(args ...interface{}) (*NeteaseNewsGenerant, error) {
 	if len(args) == 0 {
 		return nil, errors.New("at least one config to catch")
@@ -190,20 +177,21 @@ func NewNeteaseNewsGenerant(args ...interface{}) (*NeteaseNewsGenerant, error) {
 		configs[:],
 	}, nil
 }
+*/
 
 type NeteaseNewsGenerant struct {
-	configs []*NeteaseNewsCatchConfigure
+	configs []NeteaseNewsConfigure
 }
 
 func (n *NeteaseNewsGenerant) Catch() {
 	for _, config := range n.configs {
-		go config.CatchDaemon()
+		go catchDaemon(config)
 	}
 }
 
 func (n *NeteaseNewsGenerant) Stop() {
 	for _, conf := range n.configs {
-		conf.Stop()
+		stopCatchDaemon(conf)
 	}
 }
 

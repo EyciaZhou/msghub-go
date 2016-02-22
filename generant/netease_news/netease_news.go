@@ -74,6 +74,10 @@ func replyURL(id string, boardId string) string {
 	return fmt.Sprintf("http://comment.api.163.com/api/jsonp/post/list/hot/%s/%s/0/20/20/0/0", boardId, id)
 }
 
+func specialURL(id string) string {
+	return fmt.Sprintf("http://c.m.163.com/nc/special/%s.html", id)
+}
+
 func getNewsContent(id string) (*News, error) {
 	url := contentURL(id)
 	newsContentPain, err := netTools.Get(url)
@@ -96,7 +100,11 @@ func getNewsContent(id string) (*News, error) {
 }
 
 func getNewsReply(id string, boardId string) ([]Reply, error) {
+	//pass reply
+	return []Reply{}, nil
+
 	url := replyURL(id, boardId)
+	log.Info("reply url: " + url)
 	newsReplyPain, err := netTools.Get(url)
 	if err != nil {
 		return nil, err
@@ -137,15 +145,22 @@ func getNormalNews(item map[string]interface{}) (*generant.Message, error) {
 
 	//get ext info
 	flag := true
-	content.CoverURL, can = item["imgsrc"].(string)
-	flag = flag && can
+
+	if content.CoverURL, can = item["imgsrc"].(string); !can {
+		content.CoverURL = ""
+	}
+
+	if pri, can := item["priority"].(float64); !can {
+		content.Priority = -1
+	} else {
+		content.Priority = int(pri)
+	}
+
 	content.URL, can = item["url"].(string)
 	flag = flag && can
 	content.SnapTime, can = item["lmodify"].(string)
 	flag = flag && can
-	pri, can := item["priority"].(float64)
-	flag = flag && can
-	content.Priority = int(pri)
+
 	if !flag {
 		return nil, errors.New(fmt.Sprintf("can't trans type int, IMGSRC:[%t], URL:[%t], PRIORITY:[%t]\n", item["imgsrc"], item["url"], item["priority"]))
 	}
@@ -296,30 +311,97 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 	*/
 }
 
-func getNewsList(listId string, page int) ([]*generant.Message, error) {
-	newsListPain, err := netTools.Get(listURL(listId, page))
+func transArrayOfInterfaceToArrayOfMap(interfaces []interface{}) ([]map[string]interface{}) {
+	maps := make([]map[string]interface{}, len(interfaces))
+	p := 0
+	for i, _ := range interfaces {
+		if mp, ok := interfaces[i].(map[string]interface{}); ok {
+			maps[p] = mp
+			p++
+		}
+	}
+	return maps[:p]
+}
+
+func getSpecialList(specialId string) (r *generant.Topic, er error) {
+	defer func() {
+		if err := recover(); err != nil {
+			r = nil
+			er = err.(error)
+		}
+	}()
+
+	url := specialURL(specialId)
+	ListPlain, err := netTools.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Can't get plaintext of info list, url:[%s]\nerror:[%s]", url, err.Error())
+	}
+	var v map[string](map[string]interface{})
+	err = json.Unmarshal(ListPlain, &v)
+	if err != nil {
+		return nil, fmt.Errorf("Can't unmarshal plaintext, url[%s]\nerror:[%s]", url, err)
+	}
+
+	infos := v[specialId] //panic
+	topics := transArrayOfInterfaceToArrayOfMap(infos["topics"].([]interface{})) //panic^3
+
+	resultTopic := generant.Topic{
+		Id: infos["sid"].(string),
+		Title: infos["sname"].(string), //panic
+		Msgs: []*generant.Message{},
+	}
+
+	for _, t := range topics {
+		msgs, err := getNewsList(transArrayOfInterfaceToArrayOfMap(t["docs"].([]interface{}))) //panic
+		if err != nil {
+			return nil, err
+		}
+		resultTopic.Msgs = append(resultTopic.Msgs, msgs...)
+	}
+
+	var mxt int64
+	for _, msg := range resultTopic.Msgs {
+		if msg.SnapTime > mxt {
+			mxt = msg.SnapTime
+		}
+		msg.Topic = resultTopic.Id
+	}
+
+	resultTopic.LastModify = mxt
+
+	return &resultTopic, nil
+}
+
+
+func getNewsChannel(listId string, page int) ([]*generant.Message, error) {
+	url := listURL(listId, page)
+	newsListPain, err := netTools.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("Can't get plaintext of info list, url:[%s]\nerror:[%s]", url, err.Error())
 	}
 	var v map[string]([]map[string]interface{})
 	err = json.Unmarshal(newsListPain, &v)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Can't unmarshal plaintext, url[%s]\nerror:[%s]", url, err)
 	}
 
-	//debug_ned, _ := json.MarshalIndent(v, "", "	")
+	baseInfoList, ok := v[listId]
+	if !ok {
+		return nil, fmt.Errorf("illegal format of url[%s]", url)
+	}
 
-	//log.Debug((string)(debug_ned))
+	return getNewsList(baseInfoList)
+}
 
-	//log.Debug((string)(newsListPain))
+func getNewsList(baseInfoList []map[string]interface{}) ([]*generant.Message, error) {
+	var (
+		err error
+		result []*generant.Message
+		content *generant.Message
+	)
 
-	var result []*generant.Message
-
-	baseInfoList := v[listId]
-
-	var content *generant.Message
-
-	for _, item := range baseInfoList {
+	for i, item := range baseInfoList {
+		log.Infof("fetching [%d/%d]", i+1, len(baseInfoList))
 		//judge skip type
 		if typ, hv := item["skipType"]; hv {
 			if skipTyp, can := typ.(string); !can {
@@ -350,6 +432,7 @@ func getNewsList(listId string, page int) ([]*generant.Message, error) {
 		result = append(result, content)
 		//log.Debug("%d\n", len(result))
 	}
+	log.Infof("[%d fetched/%d expect]", len(result), len(baseInfoList))
 	return result, nil
 }
 
