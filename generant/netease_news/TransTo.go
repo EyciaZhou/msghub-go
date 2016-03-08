@@ -54,13 +54,13 @@ func (r Reply) ToReply() (generant.Reply, error) {
 
 func (p *NewsImage) ToImage() (*generant.Image, error) {
 	return &generant.Image{
-		p.Ref, p.Title, p.URL,
+		p.Ref, p.Title, p.Size, p.URL,
 	}, nil
 }
 
 func (p *PhototSetImage) ToImage() (*generant.Image, error) {
 	return &generant.Image{
-		"", p.Desc, p.URL,
+		"", p.Desc, "", p.URL,
 	}, nil
 }
 

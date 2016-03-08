@@ -19,6 +19,7 @@ CREATE TABLE `pic_task_queue` (
   `time` timestamp NULL DEFAULT NULL,
   `trytimes` tinyint(4) unsigned NOT NULL DEFAULT '0',
   `nodenum` int(10) unsigned DEFAULT NULL,
+  `ext` varchar(5) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `urlIndex` (`url`),
   KEY `queue` (`owner`,`status`,`time`)
@@ -48,6 +49,7 @@ CREATE TABLE `msg` (
 CREATE TABLE `picref` (
   `Ref` varchar(50) DEFAULT NULL,
   `Description` text CHARACTER SET utf8 NOT NULL,
+  `Pixes` varchar(10) DEFAULT NULL,
   `pid` int(10) unsigned zerofill NOT NULL,
   `mid` int(10) unsigned zerofill NOT NULL,
   unique key `mp` (`mid`, `pid`),

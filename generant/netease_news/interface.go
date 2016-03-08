@@ -1,5 +1,7 @@
 package netease_news
 
+//knowledge  funny technews
+
 import (
 	"errors"
 	"time"

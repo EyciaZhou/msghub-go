@@ -53,6 +53,7 @@ type Reply []*ReplyFloor
 type Image struct {
 	Ref  string `json:"ref"` //not set if not have
 	Desc string `json:"desc"`
+	Pixes string `json:"pixes"`
 	URL  string `json:"url"`
 }
 
@@ -183,7 +184,7 @@ func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return StmtInsertRef.Exec(img.Ref, img.Desc, pid, mid)
+	return StmtInsertRef.Exec(img.Ref, img.Desc, img.Pixes, pid, mid)
 }
 
 var (
@@ -366,11 +367,12 @@ func Init() {
 
 	StmtInsertRef, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
-				%s (Ref, Description, pid, mid)
+				%s (Ref, Description, Pixes, pid, mid)
 			VALUES
-				(?,?,?,?)
+				(?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
 				Ref = VALUES(Ref),
+				Pixes = VALUES(Pixes),
 				Description = VALUES(Description)`,
 		config.PicRefTableName))
 	if err != nil {
