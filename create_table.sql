@@ -1,3 +1,7 @@
+CREATE SCHEMA `msghub`;
+
+USE `msghub`;
+
 DROP TABLE  IF EXISTS `picref`;
 DROP TABLE  IF EXISTS `msg`;
 DROP TABLE  IF EXISTS `pic_task_queue`;
