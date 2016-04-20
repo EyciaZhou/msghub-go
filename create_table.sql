@@ -6,6 +6,7 @@ DROP TABLE  IF EXISTS `picref`;
 DROP TABLE  IF EXISTS `msg`;
 DROP TABLE  IF EXISTS `pic_task_queue`;
 DROP TABLE  IF EXISTS `topic`;
+DROP TABLE  IF EXISTS `author`;
 
 CREATE TABLE `topic` (
   `id` varchar(30) CHARACTER SET utf8 NOT NULL,
@@ -29,6 +30,14 @@ CREATE TABLE `pic_task_queue` (
   KEY `queue` (`owner`,`status`,`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+CREATE TABLE `author` (
+  `id` varchar(30) CHARACTER SET utf8 NOT NULL,
+  `coverImg` int(10) unsigned zerofill DEFAULT NULL,
+  `name` varchar(30) CHARACTER SET utf8 NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `coverImg2pid` FOREIGN KEY (`coverImg`) REFERENCES `pic_task_queue` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
 CREATE TABLE `msg` (
   `id` int(10) unsigned zerofill NOT NULL AUTO_INCREMENT,
   `SnapTime` int(10) unsigned NOT NULL,
@@ -46,7 +55,6 @@ CREATE TABLE `msg` (
   UNIQUE KEY `SourceURL` (`SourceURL`),
   KEY `SnapTime` (`SnapTime`),
   KEY `Topic` (`Topic`),
-  CONSTRAINT `findTopic` FOREIGN KEY (`Topic`) REFERENCES `topic` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `coverimg2pid` FOREIGN KEY (`CoverImg`) REFERENCES `pic_task_queue` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

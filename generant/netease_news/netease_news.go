@@ -164,7 +164,7 @@ func getNormalNews(item map[string]interface{}) (*generant.Message, error) {
 	if !flag {
 		return nil, errors.New(fmt.Sprintf("can't trans type int, IMGSRC:[%t], URL:[%t], PRIORITY:[%t]\n", item["imgsrc"], item["url"], item["priority"]))
 	}
-	content.ViewType = 1
+	content.ViewType = generant.VIEW_TYPE_NORMAL
 	return content.ToMsg()
 }
 
@@ -245,7 +245,7 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 
 	content.SnapTime, can = item["lmodify"].(string)
 
-	content.ViewType = 2
+	content.ViewType = generant.VIEW_TYPE_PICTURES
 
 	return content.ToMsg()
 	/*

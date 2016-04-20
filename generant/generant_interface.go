@@ -8,9 +8,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/zbindenren/logrus_mail"
-	"sync"
-	"path"
 	"io/ioutil"
+	"path"
+	"sync"
 	"time"
 )
 
@@ -27,7 +27,7 @@ type Generant interface {
 }
 
 var (
-	pluginsMu sync.Mutex
+	pluginsMu    sync.Mutex
 	regedPlugins = make(map[string]LoadConf)
 
 	generants []Generant
@@ -38,6 +38,17 @@ func Register(name string, fLoadConf LoadConf) {
 	defer pluginsMu.Unlock()
 
 	regedPlugins[name] = fLoadConf
+}
+
+const (
+	VIEW_TYPE_NORMAL = 1
+	VIEW_TYPE_PICTURES = 2
+)
+
+type Author struct {
+	Name         string `json:"name"`
+	Uid          string `json:"uid"`
+	CoverSource string `json:"covert_source"`
 }
 
 type ReplyFloor struct {
@@ -51,10 +62,10 @@ type ReplyFloor struct {
 type Reply []*ReplyFloor
 
 type Image struct {
-	Ref  string `json:"ref"` //not set if not have
-	Desc string `json:"desc"`
+	Ref   string `json:"ref"` //not set if not have
+	Desc  string `json:"desc"`
 	Pixes string `json:"pixes"`
-	URL  string `json:"url"`
+	URL   string `json:"url"`
 }
 
 type Message struct {
@@ -70,24 +81,44 @@ type Message struct {
 	ReplyNumber int      `json:"replynumber"`
 	Replys      []Reply  `json:"replys"`
 	ViewType    int      `json:"viewtype"` //*
-	Topic		string   `json:"topic"`
+	Topic       string   `json:"topic"`
 	Version     string   `json:"version"`
-	From        string   `json:"from"` //*
-	Channel     string   `json:"tag"`  //*
+	Author      Author   `json:"author"` //*	//TODO to author
 	Priority    int      `json:"priority"`
 }
 
 type Topic struct {
-	Id string `json:id`
-	Title string `json:"title"`
-	Msgs []*Message `json:"messages"`
-	LastModify int64 `json:"lastmodify"`
+	Id         string     `json:id`
+	Title      string     `json:"title"`
+	Msgs       []*Message `json:"messages"`
+	LastModify int64      `json:"lastmodify"`
+}
+
+func (t *Author) InsertIntoSQL() error {
+	if t == nil {
+		return errors.New("null author")
+	}
+
+	_, err := db.Exec(`
+	INSERT INTO
+				%s (id, coverImg, name)
+			VALUES
+				(?,?,?)
+			ON DUPLICATE KEY UPDATE
+				coverImg = VALUES(coverImg),
+				name = VALUES(name)
+	`, t.Uid, t.CoverSource, t.Name)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (t *Topic) InsertIntoSQL() error {
 	_, err := StmtTopicInsert.Exec(t.Id, t.Title, t.LastModify)
 	if err != nil {
-		log.Errorf("Error when insert topic[%v]\n, error:[%s]", *t, err.Error())
 		return err
 	}
 
@@ -118,7 +149,7 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 		TopicId.Valid, TopicId.String = true, m.Topic
 	}
 
-	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.From, m.Channel, TopicId)
+	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.Author.Uid, TopicId)
 
 	if err != nil {
 		log.Errorf("Error when insert Message[%v]\n error:[%s]", *m, err.Error())
@@ -194,13 +225,13 @@ var (
 	StmtInsertImgToQueue *sql.Stmt
 	StmtSelectPidFromURL *sql.Stmt
 	StmtSelectMidFromURL *sql.Stmt
-	StmtTopicInsert		*sql.Stmt
+	StmtTopicInsert      *sql.Stmt
 
 	ErrorNotInvaildURL = errors.New("url is not invaild")
 )
 
 type Config struct {
-	MailEnabled bool `default:"false"`
+	MailEnabled         bool   `default:"false"`
 	MailApplicationName string `default:"Generant_Interface"`
 	MailSMTPAddress     string `default:"127.0.0.1"`
 	MailSMTPPort        int    `default:"25"`
@@ -221,8 +252,8 @@ type Config struct {
 	DBUsername string `default:"root"`
 	DBPassword string `default:"fmttm233"`
 
-	ConfDir string
-	ConfFileNames []string
+	ConfDir         string
+	ConfFileNames   []string
 	ConfPluginNames []string
 }
 
@@ -238,15 +269,15 @@ func loadConfig() error {
 
 	//load self first
 	/*
-	if len(os.Args) > 1 {
-		log.Info("Loading config from ", os.Args[1])
-		err = configparser.LoadConfPath(&config, os.Args[1])
-	}
+		if len(os.Args) > 1 {
+			log.Info("Loading config from ", os.Args[1])
+			err = configparser.LoadConfPath(&config, os.Args[1])
+		}
 
-	if err != nil || len(os.Args) == 1 {
-		log.Info("Loading config use default values")
-		err = configparser.LoadConfDefault(&config)
-	}
+		if err != nil || len(os.Args) == 1 {
+			log.Info("Loading config use default values")
+			err = configparser.LoadConfDefault(&config)
+		}
 	*/
 
 	configparser.AutoLoadConfig("generant", &config)
@@ -274,7 +305,7 @@ func loadPluginConfig() error {
 
 	for i, fn := range config.ConfFileNames {
 		log.Infof("[%d/%d]...", i+1, len(config.ConfFileNames))
-		bs, err := ioutil.ReadFile(config.ConfDir+"/"+fn)
+		bs, err := ioutil.ReadFile(config.ConfDir + "/" + fn)
 		if err != nil {
 			return err
 		}
@@ -339,9 +370,9 @@ func Init() {
 	log.Info("Start prepare stmt")
 	StmtInsert, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
-				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Tag, Topic)
+				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Topic)
 			VALUES
-				(?,?,?,?,?,?,?,?,?,?,?)
+				(?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
 				SnapTime = VALUES(SnapTime),
 				PubTime = VALUES(PubTime),
@@ -417,7 +448,6 @@ func Init() {
 		return
 	}
 
-
 	log.Info("Start load plugins's config")
 	err = loadPluginConfig()
 	if err != nil {
@@ -429,7 +459,7 @@ func Init() {
 		log.Infof("[%d/%d]...", i+1, len(generants))
 		go gen.Catch()
 		log.Info("fired and start delay")
-		time.Sleep(10*time.Second)
+		time.Sleep(10 * time.Second)
 	}
 
 	log.Info("Init finished")
