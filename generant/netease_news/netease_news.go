@@ -1,12 +1,12 @@
 package netease_news
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"git.eycia.me/eycia/msghub/generant"
-	"git.eycia.me/eycia/msghub/netTools"
+	"github.com/EyciaZhou/msghub.go/generant"
+	"github.com/EyciaZhou/msghub.go/netTools"
+	log "github.com/Sirupsen/logrus"
 	"strings"
 )
 
@@ -311,7 +311,7 @@ func getPhotosetNews(item map[string]interface{}) (*generant.Message, error) {
 	*/
 }
 
-func transArrayOfInterfaceToArrayOfMap(interfaces []interface{}) ([]map[string]interface{}) {
+func transArrayOfInterfaceToArrayOfMap(interfaces []interface{}) []map[string]interface{} {
 	maps := make([]map[string]interface{}, len(interfaces))
 	p := 0
 	for i, _ := range interfaces {
@@ -342,13 +342,13 @@ func getSpecialList(specialId string) (r *generant.Topic, er error) {
 		return nil, fmt.Errorf("Can't unmarshal plaintext, url[%s]\nerror:[%s]", url, err)
 	}
 
-	infos := v[specialId] //panic
+	infos := v[specialId]                                                        //panic
 	topics := transArrayOfInterfaceToArrayOfMap(infos["topics"].([]interface{})) //panic^3
 
 	resultTopic := generant.Topic{
-		Id: infos["sid"].(string),
+		Id:    infos["sid"].(string),
 		Title: infos["sname"].(string), //panic
-		Msgs: []*generant.Message{},
+		Msgs:  []*generant.Message{},
 	}
 
 	for _, t := range topics {
@@ -372,7 +372,6 @@ func getSpecialList(specialId string) (r *generant.Topic, er error) {
 	return &resultTopic, nil
 }
 
-
 func getNewsChannel(listId string, page int) ([]*generant.Message, error) {
 	url := listURL(listId, page)
 	newsListPain, err := netTools.Get(url)
@@ -395,8 +394,8 @@ func getNewsChannel(listId string, page int) ([]*generant.Message, error) {
 
 func getNewsList(baseInfoList []map[string]interface{}) ([]*generant.Message, error) {
 	var (
-		err error
-		result []*generant.Message
+		err     error
+		result  []*generant.Message
 		content *generant.Message
 	)
 
@@ -423,9 +422,9 @@ func getNewsList(baseInfoList []map[string]interface{}) ([]*generant.Message, er
 		}
 		if err != nil {
 			log.WithFields(log.Fields{
-				"time" : "getNewsList",
-				"error" : err.Error(),
-				"item" : item,
+				"time":  "getNewsList",
+				"error": err.Error(),
+				"item":  item,
 			}).Warn("error when change map to struct")
 			continue
 		}

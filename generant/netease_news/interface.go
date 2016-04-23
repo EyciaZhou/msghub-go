@@ -3,12 +3,12 @@ package netease_news
 //knowledge  funny technews
 
 import (
-	"errors"
-	"time"
-	"git.eycia.me/eycia/msghub/generant"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/EyciaZhou/msghub.go/generant"
 	log "github.com/Sirupsen/logrus"
+	"time"
 )
 
 func mustString(m map[string]interface{}, key string) (string, bool) {
@@ -19,7 +19,7 @@ func mustString(m map[string]interface{}, key string) (string, bool) {
 	return "", false
 }
 
-func mustInt64Default(m map[string]interface{}, key string, defau int64) (int64) {
+func mustInt64Default(m map[string]interface{}, key string, defau int64) int64 {
 	if va, hv := m[key]; hv {
 		v, ok := va.(float64)
 		if !ok {
@@ -89,7 +89,7 @@ func loadChannelConfigure(cf map[string]interface{}) (*NeteaseNewsChannelConfigu
 	delayBetweenCatchRound := mustDurationDefault(cf, "delayBetweenCatchRound", time.Minute*30)
 
 	if chanName, hv := mustString(cf, "channelName"); !hv {
-		hv := true;
+		hv := true
 
 		name, h := mustString(cf, "name")
 		hv = hv && h
@@ -107,7 +107,7 @@ func loadChannelConfigure(cf map[string]interface{}) (*NeteaseNewsChannelConfigu
 		return NewNeteaseNewsCatchConfigure(
 			NeteaseNewsChannel{
 				name, url, id,
-			} ,pagesOneTime, delayBetweenPage, delayBetweenCatchRound,
+			}, pagesOneTime, delayBetweenPage, delayBetweenCatchRound,
 		)
 	} else {
 		if cha, hv := channelsDefault[chanName]; !hv {
@@ -120,7 +120,7 @@ func loadChannelConfigure(cf map[string]interface{}) (*NeteaseNewsChannelConfigu
 	}
 }
 
-func LoadGenerant(raw []byte) (generant.Generant, error) {
+func LoadGenerant(raw []byte) ([]generant.Generant, error) {
 	var cf []map[string]interface{}
 
 	err := json.Unmarshal(raw, &cf)
@@ -134,22 +134,24 @@ func LoadGenerant(raw []byte) (generant.Generant, error) {
 	for i, v := range cf {
 		conf, e := loadConfigure(v)
 		if e != nil {
-			return nil, fmt.Errorf("Netease load config error at item %d: " + e.Error(), i+1)
+			return nil, fmt.Errorf("Netease load config error at item %d: "+e.Error(), i+1)
 		}
 		configs[i] = conf
 	}
 
 	log.WithField("Plugin", "Netease News")
 
-	return &NeteaseNewsGenerant{
-		configs[:],
+	return []generant.Generant{
+		&NeteaseNewsGenerant{
+			configs[:],
+		},
 	}, nil
 }
 
 /*
 LoadConfigAndNew:
 	args should be some of *NeteaseNewsCatchConfigure, or only contain a slice of *NeteaseNewsCatchConfigure
- */
+*/
 /*
 func NewNeteaseNewsGenerant(args ...interface{}) (*NeteaseNewsGenerant, error) {
 	if len(args) == 0 {
@@ -202,5 +204,5 @@ func (n *NeteaseNewsGenerant) ForceStop() {
 }
 
 func init() {
-	generant.Register("NeteaseNews", generant.LoadConf(LoadGenerant))
+	generant.Register("NeteaseNews", (generant.LoadConf)(LoadGenerant))
 }

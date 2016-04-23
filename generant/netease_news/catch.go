@@ -1,10 +1,10 @@
 package netease_news
 
 import (
+	"errors"
+	"github.com/EyciaZhou/msghub.go/generant"
 	log "github.com/Sirupsen/logrus"
 	"time"
-	"errors"
-	"git.eycia.me/eycia/msghub/generant"
 )
 
 type NeteaseNewsConfigure interface {
@@ -14,7 +14,7 @@ type NeteaseNewsConfigure interface {
 }
 
 type NeteaseNewsTopicConfigure struct {
-	TopicId string
+	TopicId                    string
 	delayBetweenEachCatchRound time.Duration
 
 	quit chan int
@@ -22,23 +22,23 @@ type NeteaseNewsTopicConfigure struct {
 
 func NewNeteaseNewsTopicConfigure(topicid string, delayBetweenEachCatchRound time.Duration) (*NeteaseNewsTopicConfigure, error) {
 	return &NeteaseNewsTopicConfigure{
-		TopicId:topicid,
-		delayBetweenEachCatchRound:delayBetweenEachCatchRound,
-		quit:make(chan int),
+		TopicId:                    topicid,
+		delayBetweenEachCatchRound: delayBetweenEachCatchRound,
+		quit: make(chan int),
 	}, nil
 }
 
 type NeteaseNewsChannelConfigure struct {
 	NeteaseNewsChannel
-	pagesOneTime		int
-	delayBetweenPage	time.Duration
+	pagesOneTime               int
+	delayBetweenPage           time.Duration
 	delayBetweenEachCatchRound time.Duration
 
 	quit chan int
 }
 
 func NewNeteaseNewsCatchConfigure(chann NeteaseNewsChannel, pagesOneTime int,
-delayBetweenPage, delayBetweenEachCatchRound time.Duration) (*NeteaseNewsChannelConfigure, error) {
+	delayBetweenPage, delayBetweenEachCatchRound time.Duration) (*NeteaseNewsChannelConfigure, error) {
 	return &NeteaseNewsChannelConfigure{
 		chann,
 		pagesOneTime,
@@ -64,7 +64,7 @@ func NewDefaultNeteaseNewsChannelConfigure(channelName string) (*NeteaseNewsChan
 	}, nil
 }
 
-func (conf *NeteaseNewsTopicConfigure)CatchOneTime() {
+func (conf *NeteaseNewsTopicConfigure) CatchOneTime() {
 	chanFetch := make(chan int, 1)
 	var (
 		m *generant.Topic
@@ -101,26 +101,26 @@ func (conf *NeteaseNewsTopicConfigure)CatchOneTime() {
 	log.Infof("Topic[%s] fetch finished", conf.TopicId)
 }
 
-func (conf *NeteaseNewsTopicConfigure)Quit() chan int {
+func (conf *NeteaseNewsTopicConfigure) Quit() chan int {
 	return conf.quit
 }
 
-func (conf *NeteaseNewsTopicConfigure)DelayBetweenEachCatchRound() time.Duration {
+func (conf *NeteaseNewsTopicConfigure) DelayBetweenEachCatchRound() time.Duration {
 	return conf.delayBetweenEachCatchRound
 }
 
-func (conf *NeteaseNewsChannelConfigure)Quit() chan int {
+func (conf *NeteaseNewsChannelConfigure) Quit() chan int {
 	return conf.quit
 }
 
-func (conf *NeteaseNewsChannelConfigure)DelayBetweenEachCatchRound() time.Duration {
+func (conf *NeteaseNewsChannelConfigure) DelayBetweenEachCatchRound() time.Duration {
 	return conf.delayBetweenEachCatchRound
 }
 
-func (conf *NeteaseNewsChannelConfigure)CatchOneTime() {
+func (conf *NeteaseNewsChannelConfigure) CatchOneTime() {
 	log.WithFields(log.Fields{
-		"channel" : conf.Name,
-		"page num" : conf.pagesOneTime,
+		"channel":  conf.Name,
+		"page num": conf.pagesOneTime,
 	}).Info("Start Catch")
 
 	cnt := 0
@@ -128,39 +128,39 @@ func (conf *NeteaseNewsChannelConfigure)CatchOneTime() {
 	for i := 0; i < conf.pagesOneTime; i++ {
 		if i != 0 {
 			select {
-			case <-time.After(conf.delayBetweenPage) :
+			case <-time.After(conf.delayBetweenPage):
 
-			case <-conf.quit :
+			case <-conf.quit:
 				return
 			}
 		}
 
 		log.WithFields(log.Fields{
-			"channel" : conf.Name,
-			"page no." : i,
+			"channel":  conf.Name,
+			"page no.": i,
 		}).Info("Start Catch Page")
 
 		news, err := getNewsChannel(conf.ID, i)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"channel" : conf.Name,
-				"page no." : i,
-				"error" : err.Error(),
+				"channel":  conf.Name,
+				"page no.": i,
+				"error":    err.Error(),
 			}).Error("Errors when catch")
 			continue
 		}
 		log.WithFields(log.Fields{
-			"channel" : conf.Name,
-			"page no." : i,
+			"channel":  conf.Name,
+			"page no.": i,
 		}).Info("Fetch Page ends")
 
 		for _, item := range news {
-			item.Channel = conf.Name
+			item.Tag = conf.Name
 			if _, err := item.InsertIntoSQL(); err != nil {
 				log.WithFields(log.Fields{
-					"channel" : conf.Name,
-					"page no." : i,
-					"error" : err.Error(),
+					"channel":  conf.Name,
+					"page no.": i,
+					"error":    err.Error(),
 				}).Error("Errors when insert into sql")
 				continue
 			}
@@ -169,7 +169,7 @@ func (conf *NeteaseNewsChannelConfigure)CatchOneTime() {
 	}
 
 	log.WithFields(log.Fields{
-		"channel" : conf.Name,
+		"channel": conf.Name,
 	}).Infof("End Catch, [%d] News expected, [%d] News Really Catched, Thread goes sleep", 20*conf.pagesOneTime, cnt)
 
 }
@@ -178,7 +178,7 @@ func catchDaemon(conf NeteaseNewsConfigure) {
 	conf.CatchOneTime()
 	for {
 		select {
-		case <-time.After(conf.DelayBetweenEachCatchRound()) :
+		case <-time.After(conf.DelayBetweenEachCatchRound()):
 			conf.CatchOneTime()
 		case <-conf.Quit():
 			return
@@ -191,4 +191,3 @@ func stopCatchDaemon(conf NeteaseNewsConfigure) {
 		close(conf.Quit())
 	}
 }
-

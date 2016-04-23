@@ -48,7 +48,7 @@ CREATE TABLE `msg` (
   `SubTitle` text CHARACTER SET utf8 NOT NULL,
   `CoverImg` int(10) unsigned zerofill DEFAULT NULL,
   `ViewType` tinyint(4) NOT NULL,
-  `Frm` varchar(30) CHARACTER SET utf8 NOT NULL,
+  `AuthorId` varchar(30) CHARACTER SET utf8 NOT NULL,
   `Tag` varchar(30) CHARACTER SET utf8 NOT NULL,
   `Topic` varchar(30) CHARACTER SET utf8 DEFAULT NULL,
   PRIMARY KEY (`id`),

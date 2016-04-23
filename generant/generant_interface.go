@@ -8,47 +8,42 @@ import (
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/zbindenren/logrus_mail"
-	"io/ioutil"
-	"path"
-	"sync"
 	"time"
 )
 
-type LoadConf func(raw []byte) (Generant, error)
-
-type Generant interface {
-	Catch()
-
-	//Stop: maybe could continue this round catch, and insert into mysql
-	Stop()
-
-	//ForceStop: stop immediately, drop this round, only do some clean etc
-	ForceStop()
-}
-
-var (
-	pluginsMu    sync.Mutex
-	regedPlugins = make(map[string]LoadConf)
-
-	generants []Generant
-)
-
-func Register(name string, fLoadConf LoadConf) {
-	pluginsMu.Lock()
-	defer pluginsMu.Unlock()
-
-	regedPlugins[name] = fLoadConf
-}
-
 const (
-	VIEW_TYPE_NORMAL = 1
+	VIEW_TYPE_NORMAL   = 1
 	VIEW_TYPE_PICTURES = 2
 )
 
 type Author struct {
-	Name         string `json:"name"`
-	Uid          string `json:"uid"`
+	Name        string `json:"name"`
+	Uid         string `json:"uid"`
 	CoverSource string `json:"covert_source"`
+}
+
+func (t *Author) InsertIntoSQL() error {
+	if t == nil {
+		return errors.New("null author")
+	}
+
+	pid, err := insertImgUrlIntoQueue(t.CoverSource)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+	INSERT INTO
+				%s (id, coverImg, name)
+			VALUES
+				(?,?,?)
+			ON DUPLICATE KEY UPDATE
+				coverImg = VALUES(coverImg),
+				name = VALUES(name)
+	`, t.Uid, pid, t.Name)
+
+	return err
 }
 
 type ReplyFloor struct {
@@ -68,6 +63,18 @@ type Image struct {
 	URL   string `json:"url"`
 }
 
+func (img *Image) InsertIntoQueue() (int64, error) {
+	return insertImgUrlIntoQueue(img.URL)
+}
+
+func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
+	pid, err := img.InsertIntoQueue()
+	if err != nil {
+		return nil, err
+	}
+	return StmtInsertRef.Exec(img.Ref, img.Desc, img.Pixes, pid, mid)
+}
+
 type Message struct {
 	//ID          string   `json:"id"`
 	SnapTime    int64    `json:"snaptime"` //*   //lastmodify
@@ -78,60 +85,24 @@ type Message struct {
 	Subtitle    string   `json:"subtitle"` //*
 	CoverImg    string   `json:"coverimg"` //if not have this field shoud be "" //*
 	Images      []*Image `json:"images"`
-	ReplyNumber int      `json:"replynumber"`
+	ReplyNumber int64     `json:"replynumber"`
 	Replys      []Reply  `json:"replys"`
 	ViewType    int      `json:"viewtype"` //*
-	Topic       string   `json:"topic"`
+	Topic       string   `json:"topic"`    //*
 	Version     string   `json:"version"`
-	Author      Author   `json:"author"` //*	//TODO to author
+	Tag         string   `json:"tag"`    //*
+	Author      *Author  `json:"author"` //*
 	Priority    int      `json:"priority"`
-}
-
-type Topic struct {
-	Id         string     `json:id`
-	Title      string     `json:"title"`
-	Msgs       []*Message `json:"messages"`
-	LastModify int64      `json:"lastmodify"`
-}
-
-func (t *Author) InsertIntoSQL() error {
-	if t == nil {
-		return errors.New("null author")
-	}
-
-	_, err := db.Exec(`
-	INSERT INTO
-				%s (id, coverImg, name)
-			VALUES
-				(?,?,?)
-			ON DUPLICATE KEY UPDATE
-				coverImg = VALUES(coverImg),
-				name = VALUES(name)
-	`, t.Uid, t.CoverSource, t.Name)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (t *Topic) InsertIntoSQL() error {
-	_, err := StmtTopicInsert.Exec(t.Id, t.Title, t.LastModify)
-	if err != nil {
-		return err
-	}
-
-	for _, msg := range t.Msgs {
-		_, _ = msg.InsertIntoSQL()
-	}
-
-	return nil
 }
 
 func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	//insert cover img
 	var coverImgId sql.NullInt64
+
+	err := m.Author.InsertIntoSQL()
+	if err != nil {
+		return nil, err
+	}
 
 	if m.CoverImg != "" {
 		var err error
@@ -149,7 +120,7 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 		TopicId.Valid, TopicId.String = true, m.Topic
 	}
 
-	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.Author.Uid, TopicId)
+	res, err := StmtInsert.Exec(m.SnapTime, m.PubTime, m.Source, m.Body, m.Title, m.Subtitle, coverImgId, m.ViewType, m.Author.Uid, m.Tag, TopicId)
 
 	if err != nil {
 		log.Errorf("Error when insert Message[%v]\n error:[%s]", *m, err.Error())
@@ -172,6 +143,26 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	}
 
 	return res, nil
+}
+
+type Topic struct {
+	Id         string     `json:"id"`
+	Title      string     `json:"title"`
+	Msgs       []*Message `json:"messages"`
+	LastModify int64      `json:"lastmodify"`
+}
+
+func (t *Topic) InsertIntoSQL() error {
+	_, err := StmtTopicInsert.Exec(t.Id, t.Title, t.LastModify)
+	if err != nil {
+		return err
+	}
+
+	for _, msg := range t.Msgs {
+		_, _ = msg.InsertIntoSQL()
+	}
+
+	return nil
 }
 
 func isUrl(ur string) bool {
@@ -206,18 +197,6 @@ func insertImgUrlIntoQueue(url string) (int64, error) {
 	return 0, ErrorNotInvaildURL
 }
 
-func (img *Image) InsertIntoQueue() (int64, error) {
-	return insertImgUrlIntoQueue(img.URL)
-}
-
-func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
-	pid, err := img.InsertIntoQueue()
-	if err != nil {
-		return nil, err
-	}
-	return StmtInsertRef.Exec(img.Ref, img.Desc, img.Pixes, pid, mid)
-}
-
 var (
 	db                   *sql.DB
 	StmtInsert           *sql.Stmt
@@ -230,7 +209,7 @@ var (
 	ErrorNotInvaildURL = errors.New("url is not invaild")
 )
 
-type Config struct {
+type config_t struct {
 	MailEnabled         bool   `default:"false"`
 	MailApplicationName string `default:"Generant_Interface"`
 	MailSMTPAddress     string `default:"127.0.0.1"`
@@ -258,7 +237,7 @@ type Config struct {
 }
 
 var (
-	config Config
+	config config_t
 )
 
 func loadConfig() error {
@@ -267,60 +246,10 @@ func loadConfig() error {
 
 	var err error
 
-	//load self first
-	/*
-		if len(os.Args) > 1 {
-			log.Info("Loading config from ", os.Args[1])
-			err = configparser.LoadConfPath(&config, os.Args[1])
-		}
-
-		if err != nil || len(os.Args) == 1 {
-			log.Info("Loading config use default values")
-			err = configparser.LoadConfDefault(&config)
-		}
-	*/
-
 	configparser.AutoLoadConfig("generant", &config)
-	//configparser.LoadConfFromFlag(&config)
 	configparser.ToJson(&config)
 
 	return err
-}
-
-func loadPluginConfig() error {
-	//
-	if generants != nil && len(generants) > 0 {
-		return errors.New("can't load config twice")
-	}
-
-	if len(config.ConfFileNames) != len(config.ConfPluginNames) {
-		return errors.New("the length of ConfFileNames and ConfPluginNames not same")
-	}
-
-	generants = make([]Generant, len(config.ConfPluginNames))
-
-	config.ConfDir = path.Clean(config.ConfDir)
-
-	log.Infof("%d plugin configs to load", len(config.ConfFileNames))
-
-	for i, fn := range config.ConfFileNames {
-		log.Infof("[%d/%d]...", i+1, len(config.ConfFileNames))
-		bs, err := ioutil.ReadFile(config.ConfDir + "/" + fn)
-		if err != nil {
-			return err
-		}
-
-		if plugin, hv := regedPlugins[config.ConfPluginNames[i]]; !hv {
-			return errors.New("Doesn't registed Plugin : " + config.ConfPluginNames[i])
-		} else {
-			generants[i], err = plugin(bs)
-			if err != nil {
-				return fmt.Errorf("Error when load %d th plugin : %s", i+1, err.Error())
-			}
-		}
-	}
-
-	return nil
 }
 
 func Init() {
@@ -370,9 +299,9 @@ func Init() {
 	log.Info("Start prepare stmt")
 	StmtInsert, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO
-				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, Frm, Topic)
+				%s (SnapTime, PubTime, SourceURL, Body, Title, SubTitle, CoverImg, ViewType, AuthorId, Tag, Topic)
 			VALUES
-				(?,?,?,?,?,?,?,?,?,?)
+				(?,?,?,?,?,?,?,?,?,?,?)
 			ON DUPLICATE KEY UPDATE
 				SnapTime = VALUES(SnapTime),
 				PubTime = VALUES(PubTime),
@@ -381,6 +310,8 @@ func Init() {
 				SubTitle = VALUES(SubTitle),
 				CoverImg = VALUES(CoverImg),
 				ViewType = VALUES(ViewType),
+				AuthorId = VALUES(AuthorId),
+				Tag = VALUES(Tag),
 				Topic = VALUES(Topic)`, config.MsgTableName))
 	if err != nil {
 		log.Panic(err.Error())

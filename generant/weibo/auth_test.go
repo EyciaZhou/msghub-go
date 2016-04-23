@@ -1,7 +1,8 @@
 package weibo
+
 import (
-	"testing"
 	"encoding/json"
+	"testing"
 )
 
 var testTweet = `

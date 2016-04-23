@@ -1,8 +1,8 @@
 package netease_news
 
 import (
+	"github.com/EyciaZhou/msghub.go/generant"
 	log "github.com/Sirupsen/logrus"
-	"git.eycia.me/eycia/msghub/generant"
 	"strconv"
 	"time"
 )
@@ -11,6 +11,14 @@ var (
 	//2015-09-02 08:33:27
 	timeFormat = "2006-01-02 15:04:05"
 	loc        *time.Location
+)
+
+var (
+	authorNetEaseNews = &generant.Author{
+		Uid:         "NetEaseNews",
+		Name:        "网易新闻",
+		CoverSource: "http://www.apk20.com/image/icon-385074",
+	}
 )
 
 func parseTime(ts string) (int64, error) {
@@ -73,9 +81,9 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		nReply, err := item.ToReply()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"time" : "fetch",
-				"reply" : item,
-				"error" : err.Error(),
+				"time":  "fetch",
+				"reply": item,
+				"error": err.Error(),
 			}).Warning("error throwed when reply trans")
 			continue
 		}
@@ -87,9 +95,9 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		nImage, err := item.ToImage()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"time" : "fetch",
-				"image" : item,
-				"error" : err.Error(),
+				"time":  "fetch",
+				"image": item,
+				"error": err.Error(),
 			}).Warning("error throwed when image trans")
 			continue
 		}
@@ -114,11 +122,11 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		Subtitle:    n.SubTitle,
 		CoverImg:    n.CoverURL,
 		Images:      imgs,
-		ReplyNumber: n.ReplyCount,
+		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
 		ViewType:    n.ViewType,
 		Version:     "0.1",
-		From:        "Netease News",
+		Author:      authorNetEaseNews,
 		Priority:    n.Priority,
 	}, nil
 }
@@ -132,9 +140,9 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		nReply, err := item.ToReply()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"time" : "fetch",
-				"reply" : item,
-				"error" : err.Error(),
+				"time":  "fetch",
+				"reply": item,
+				"error": err.Error(),
 			}).Warning("error throwed when reply trans")
 			continue
 		}
@@ -146,9 +154,9 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		nImage, err := item.ToImage()
 		if err != nil {
 			log.WithFields(log.Fields{
-				"time" : "fetch",
-				"image" : item,
-				"error" : err.Error(),
+				"time":  "fetch",
+				"image": item,
+				"error": err.Error(),
 			}).Warning("error throwed when image trans")
 			continue
 		}
@@ -175,11 +183,11 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		Subtitle:    n.SubTitle,
 		CoverImg:    n.CoverURL,
 		Images:      imgs,
-		ReplyNumber: n.ReplyCount,
+		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
 		ViewType:    n.ViewType,
 		Version:     "0.1",
-		From:        "Netease News",
+		Author:      authorNetEaseNews,
 		Priority:    n.Priority,
 	}, nil
 }
