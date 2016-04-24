@@ -41,11 +41,11 @@ func (p *FriendsTimelineController)since(SinceId string) ([]*weibo_types.Tweet, 
 			return nil, err
 		}
 
-		if len(tweets) == 0 {
+		if len(tweets_new) == 0 {
 			return tweets, nil
 		}
 
-		SinceId = tweets[0].Idstr
+		SinceId = tweets_new[0].Idstr
 
 		tweets = append(tweets, tweets_new...)
 	}

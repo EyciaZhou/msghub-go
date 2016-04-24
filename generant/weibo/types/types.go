@@ -10,7 +10,7 @@ import (
 type User struct {
 	Name       string `json:"name"`
 	Idstr      string `json:"idstr"`
-	CoverImage string `json:"cover_image"`
+	CoverImage string `json:"avatar_large"`
 }
 
 type PicUrl struct {
@@ -134,16 +134,30 @@ func (p *Tweet) Convert() (*generant.Message, error) {
 	result.PubTime = pubtime.Unix()
 	result.Source = p.GetSource()
 	result.Body = p.Text
+
+	if p.RetweetedStatus != nil {
+		result.Body += "//" + p.RetweetedStatus.Text
+	}
+
 	result.Title = ""                //no title, replace with author's name
 	result.Subtitle = p.Text         //display on first screen
-	result.CoverImg = p.ThumbnailPic //"" if not have
-	result.Images = p.PicUrls.Convert()
 	result.ReplyNumber = p.CommentsCount
 	result.Replys = nil //TODO
 	result.ViewType = generant.VIEW_TYPE_PICTURES
 	result.Topic = "weibo_" + p.User.Idstr
 	result.Author = p.User.Convert()
 	result.Tag = "" //TODO
+
+	if p.RetweetedStatus != nil {
+		p = p.RetweetedStatus
+	}
+
+	result.CoverImg = p.ThumbnailPic //"" if not have
+	result.Images = p.PicUrls.Convert()
+
+
+
+
 
 	return result, nil
 }

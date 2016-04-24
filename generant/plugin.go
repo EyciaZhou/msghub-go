@@ -44,7 +44,7 @@ func loadPluginConfig() error {
 		return errors.New("the length of ConfFileNames and ConfPluginNames not same")
 	}
 
-	generants := []Generant{}
+	generants = []Generant{}
 
 	config.ConfDir = path.Clean(config.ConfDir)
 

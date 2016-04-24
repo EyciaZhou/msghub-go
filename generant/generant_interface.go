@@ -35,7 +35,7 @@ func (t *Author) InsertIntoSQL() error {
 
 	_, err = db.Exec(`
 	INSERT INTO
-				%s (id, coverImg, name)
+				author (id, coverImg, name)
 			VALUES
 				(?,?,?)
 			ON DUPLICATE KEY UPDATE
@@ -139,7 +139,10 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	}
 
 	for _, img := range m.Images {
-		_, _ = img.InsertIntoSQL(id)
+		_, err = img.InsertIntoSQL(id)
+		if err != nil {
+			log.Warn(err.Error())
+		}
 	}
 
 	return res, nil
@@ -159,7 +162,10 @@ func (t *Topic) InsertIntoSQL() error {
 	}
 
 	for _, msg := range t.Msgs {
-		_, _ = msg.InsertIntoSQL()
+		_, err = msg.InsertIntoSQL()
+		if err != nil {
+			log.Warn(err.Error())
+		}
 	}
 
 	return nil
@@ -283,7 +289,7 @@ func Init() {
 	}
 
 	log.Info("Start Connect mysql")
-	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
+	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?collation=utf8mb4_general_ci", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
 	db, err = sql.Open("mysql", url)
 	if err != nil {
 		log.Panic("Can't Connect DB REASON : " + err.Error())

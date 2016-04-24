@@ -24,6 +24,8 @@ func NewFriendsTimelineGrenrant() *friendsTimelineGenerant {
 }
 
 func (p *friendsTimelineGenerant) catchOneTime(ended chan bool) {
+	logrus.Info("weibo start catch")
+
 	chanFetch := make(chan int, 1)
 	var (
 		m weibo_types.Tweets
@@ -59,6 +61,8 @@ func (p *friendsTimelineGenerant) catchOneTime(ended chan bool) {
 		logrus.Errorf("Insert Topic[%s] into sql Error: %s", topic.Id, e.Error())
 	}
 	ended <- true
+
+	logrus.Infof("weibo %d catched", len(m))
 }
 
 func (p *friendsTimelineGenerant) Catch() {
