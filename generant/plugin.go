@@ -1,30 +1,29 @@
 package generant
+
 import (
-	"sync"
 	"errors"
-	"path"
-	"io/ioutil"
-	log "github.com/Sirupsen/logrus"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"io/ioutil"
+	"path"
+	"sync"
 )
 
-type LoadConf func(raw []byte) ([]Generant, error)
+type LoadConf func(raw []byte) ([]GetNewer, error)
 
-type Generant interface {
-	Catch()
+type CanConvertToTopic interface {
+	Convert() *Topic
+}
 
-	//Stop: maybe could continue this round catch, and insert into mysql
-	Stop()
-
-	//ForceStop: stop immediately, drop this round, only do some clean etc
-	ForceStop()
+type GetNewer interface {
+	GetNew() (CanConvertToTopic, error)
 }
 
 var (
 	pluginsMu    sync.Mutex
 	regedPlugins = make(map[string]LoadConf)
 
-	generants []Generant
+	generants []*Generant
 )
 
 func Register(name string, fLoadConf LoadConf) {
@@ -44,7 +43,7 @@ func loadPluginConfig() error {
 		return errors.New("the length of ConfFileNames and ConfPluginNames not same")
 	}
 
-	generants = []Generant{}
+	generants = []*Generant{}
 
 	config.ConfDir = path.Clean(config.ConfDir)
 
@@ -60,14 +59,15 @@ func loadPluginConfig() error {
 		if plugin, hv := regedPlugins[config.ConfPluginNames[i]]; !hv {
 			return errors.New("Doesn't registed Plugin : " + config.ConfPluginNames[i])
 		} else {
-			gs, err := plugin(bs)
+			gns, err := plugin(bs)
 			if err != nil {
 				return fmt.Errorf("Error when load %d th plugin : %s", i+1, err.Error())
 			}
-			generants = append(generants, gs...)
+			for _, gn := range gns {
+				generants = append(generants, NewGrenrant(gn))
+			}
 		}
 	}
 
 	return nil
 }
-

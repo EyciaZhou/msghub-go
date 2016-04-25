@@ -1,9 +1,10 @@
 package weibo_api
 
 import (
+	"github.com/EyciaZhou/msghub.go/generant/utils"
 	"github.com/EyciaZhou/msghub.go/generant/weibo/types"
-	"github.com/EyciaZhou/msghub.go/generant/weibo/utils"
 	"net/url"
+	"github.com/EyciaZhou/msghub.go/generant"
 )
 
 const (
@@ -12,7 +13,7 @@ const (
 	_URL_GET_TOKEN_INFO   = "https://api.weibo.com/oauth2/get_token_info"
 )
 
-func (p *FriendsTimelineController)firstPage() ([]*weibo_types.Tweet, error) {
+func (p *FriendsTimelineController) firstPage() ([]*weibo_types.Tweet, error) {
 	args := url.Values{
 		"access_token": {p.token},
 		"count":        {"100"},
@@ -20,7 +21,7 @@ func (p *FriendsTimelineController)firstPage() ([]*weibo_types.Tweet, error) {
 
 	wtl := weibo_types.Timeline{}
 
-	err := weibo_utils.RequestToJson("GET", _URL_FRIENDS_TIMELINE, args, &wtl)
+	err := generant_utils.RequestToJson("GET", _URL_FRIENDS_TIMELINE, args, &wtl)
 
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func (p *FriendsTimelineController)firstPage() ([]*weibo_types.Tweet, error) {
 	return wtl.Statuses, nil
 }
 
-func (p *FriendsTimelineController)since(SinceId string) ([]*weibo_types.Tweet, error) {
+func (p *FriendsTimelineController) since(SinceId string) ([]*weibo_types.Tweet, error) {
 	tweets := []*weibo_types.Tweet{}
 	for {
 		tweets_new, err := p.pageFlip(SinceId)
@@ -51,7 +52,7 @@ func (p *FriendsTimelineController)since(SinceId string) ([]*weibo_types.Tweet, 
 	}
 }
 
-func (p *FriendsTimelineController)pageFlip(SinceId string) ([]*weibo_types.Tweet, error) {
+func (p *FriendsTimelineController) pageFlip(SinceId string) ([]*weibo_types.Tweet, error) {
 	args := url.Values{
 		"access_token": {p.token},
 		"since_id":     {SinceId},
@@ -60,7 +61,7 @@ func (p *FriendsTimelineController)pageFlip(SinceId string) ([]*weibo_types.Twee
 
 	wtl := weibo_types.Timeline{}
 
-	err := weibo_utils.RequestToJson("GET", _URL_FRIENDS_TIMELINE, args, &wtl)
+	err := generant_utils.RequestToJson("GET", _URL_FRIENDS_TIMELINE, args, &wtl)
 
 	if err != nil {
 		return nil, err
@@ -75,29 +76,28 @@ func (p *FriendsTimelineController)pageFlip(SinceId string) ([]*weibo_types.Twee
 
 type FriendsTimelineController struct {
 	token string
-
 	lstid string
 }
 
 func NewFriendsTimelineController(token string, lstid string) *FriendsTimelineController {
 	return &FriendsTimelineController{
-		token : token,
-		lstid : lstid,
+		token: token,
+		lstid: lstid,
 	}
 }
 
-func (p *FriendsTimelineController) GetNew()  (weibo_types.Tweets, error) {
+func (p *FriendsTimelineController) GetNew() (generant.CanConvertToTopic, error) {
 	if p.lstid == "" {
 		ts, err := p.firstPage()
 		if err == nil && len(ts) > 0 {
 			p.lstid = ts[0].Idstr
 		}
-		return ts, err
+		return (weibo_types.Tweets)(ts), err
 	}
 
 	ts, err := p.since(p.lstid)
 	if err == nil && len(ts) > 0 {
 		p.lstid = ts[0].Idstr
 	}
-	return ts, err
+	return (weibo_types.Tweets)(ts), err
 }

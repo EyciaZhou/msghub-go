@@ -2,14 +2,12 @@ package weibo
 
 import (
 	"github.com/EyciaZhou/msghub.go/generant"
-	"github.com/EyciaZhou/msghub.go/generant/weibo/generant"
+	"github.com/EyciaZhou/msghub.go/generant/weibo/api"
 )
 
-func LoadConf(raw []byte) ([]generant.Generant, error) {
-	//pass now
-
-	return []generant.Generant{
-		weibo_generant.NewFriendsTimelineGrenrant(),
+func LoadConf(raw []byte) ([]generant.GetNewer, error) {
+	return []generant.GetNewer{
+		weibo_api.NewFriendsTimelineController((string)(raw), ""),
 	}, nil
 }
 

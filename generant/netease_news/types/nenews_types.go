@@ -1,9 +1,20 @@
-package netease_news
+package nenews_types
 
-type News struct {
+import "github.com/EyciaZhou/msghub.go/generant"
+
+type News interface {
+	Convert() (*generant.Message, error)
+}
+
+type Topic struct {
+	Newss []News
+	Id    string
+	Title string
+}
+
+type NormalNews struct {
 	CoverURL string `json:"-"`
 	URL      string `json:"-"`
-	Priority int    `json:"-"`
 
 	ID         string       `json:"docid"`
 	ReplyCount int          `json:"replyCount"`
@@ -15,12 +26,10 @@ type News struct {
 	Body       string       `json:"body"`
 	Images     []*NewsImage `json:"img"`
 
-	Replys   []Reply `json:"-"`
-	ViewType int     `json:"-"`
+	Replys []Reply `json:"-"`
 }
 
 type PhotoSet struct {
-	Priority   int    `json:"-"`
 	ReplyCount int    `json:"-"`
 	SnapTime   string `json:"-"`
 	Body       string `json:"-"`
@@ -35,8 +44,7 @@ type PhotoSet struct {
 
 	Images []*PhototSetImage `json:"photos"`
 
-	Replys   []Reply `json:"-"`
-	ViewType int     `json:"-"`
+	Replys []Reply `json:"-"`
 }
 
 type PhototSetImage struct {
@@ -54,7 +62,7 @@ type ReplyFloor struct {
 
 type Reply map[string]*ReplyFloor
 
-type reply_tmp struct {
+type Reply_tmp struct {
 	HotPosts []Reply `json:"hotPosts"`
 }
 

@@ -2,9 +2,9 @@ package weibo_types
 
 import (
 	"github.com/EyciaZhou/msghub.go/generant"
+	"github.com/Sirupsen/logrus"
 	"strings"
 	"time"
-	"github.com/Sirupsen/logrus"
 )
 
 type User struct {
@@ -40,7 +40,7 @@ type Timeline struct {
 
 type Tweets []*Tweet
 
-func (p Tweets) Convert()(*generant.Topic) {
+func (p Tweets) Convert() *generant.Topic {
 	result := make([]*generant.Message, len(p))
 
 	cnt := 0
@@ -114,7 +114,7 @@ func (p PicUrls) Convert() []*generant.Image {
 	return result
 }
 
-func (p *User) Convert() (*generant.Author) {
+func (p *User) Convert() *generant.Author {
 	return &generant.Author{
 		Name:        p.Name,
 		Uid:         "weibo_" + p.Idstr,
@@ -125,12 +125,11 @@ func (p *User) Convert() (*generant.Author) {
 func (p *Tweet) Convert() (*generant.Message, error) {
 	result := &generant.Message{}
 
-	result.SnapTime = time.Now().Unix()
-
 	pubtime, err := time.Parse(weiboTimeLayout, p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	result.SnapTime = pubtime.Unix()
 	result.PubTime = pubtime.Unix()
 	result.Source = p.GetSource()
 	result.Body = p.Text
@@ -139,25 +138,22 @@ func (p *Tweet) Convert() (*generant.Message, error) {
 		result.Body += "//" + p.RetweetedStatus.Text
 	}
 
-	result.Title = ""                //no title, replace with author's name
-	result.Subtitle = p.Text         //display on first screen
+	result.Title = ""             //no title, replace with author's name
+	result.Subtitle = result.Body //display on first screen
 	result.ReplyNumber = p.CommentsCount
 	result.Replys = nil //TODO
 	result.ViewType = generant.VIEW_TYPE_PICTURES
-	result.Topic = "weibo_" + p.User.Idstr
+	result.Topic = "weibo_friendsline"
 	result.Author = p.User.Convert()
 	result.Tag = "" //TODO
 
+	//if retweet, use Retweeted's coverimg and imgages
 	if p.RetweetedStatus != nil {
 		p = p.RetweetedStatus
 	}
 
 	result.CoverImg = p.ThumbnailPic //"" if not have
 	result.Images = p.PicUrls.Convert()
-
-
-
-
 
 	return result, nil
 }

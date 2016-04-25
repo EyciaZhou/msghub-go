@@ -1,6 +1,7 @@
-package netease_news
+package nenews_types
 
 import (
+	"errors"
 	"github.com/EyciaZhou/msghub.go/generant"
 	log "github.com/Sirupsen/logrus"
 	"strconv"
@@ -29,62 +30,67 @@ func parseTime(ts string) (int64, error) {
 	return ti.Unix(), nil
 }
 
-//ToReply: if any floor errors, it returns nil and error
-func (r Reply) ToReply() (generant.Reply, error) {
-	var reply generant.Reply
+func (r Reply) Convert() (generant.Reply, error) {
+	var e error
 
 	length := len(r)
+	reply := make(generant.Reply, length)
+
+	cnt := 0
 	for i := 1; i <= length; i++ {
 		id := strconv.Itoa(i)
-		ti, _ := parseTime(r[id].Time)
-		/* only last floor have time
-		if e != nil {
-			return nil, e
+		if _, ok := r[id]; !ok {
+			return nil, errors.New("error when parse reply, missing floor " + id)
 		}
-		*/
-		dig, _ := strconv.Atoi((r)[id].Digg)
-		/*
-			only last florr have digg
+
+		ti := (int64)(0)
+		dig := 0
+
+		if i == length {
+			//only last floor have time and digg
+			ti, e = parseTime(r[id].Time)
 			if e != nil {
 				return nil, e
 			}
-		*/
-		reply = append(reply, &generant.ReplyFloor{
+			dig, e = strconv.Atoi((r)[id].Digg)
+			if e != nil {
+				return nil, e
+			}
+		}
+
+		reply[cnt] = &generant.ReplyFloor{
 			Floor:   i,
 			Time:    ti,
-			Name:    (r)[id].Name,
-			Content: (r)[id].Content,
+			Name:    r[id].Name,
+			Content: r[id].Content,
 			Digg:    dig,
-		})
+		}
+		cnt++
 	}
 	return reply, nil
 }
 
-func (p *NewsImage) ToImage() (*generant.Image, error) {
+func (p *NewsImage) Convert() *generant.Image {
 	return &generant.Image{
 		p.Ref, p.Title, p.Size, p.URL,
-	}, nil
+	}
 }
 
-func (p *PhototSetImage) ToImage() (*generant.Image, error) {
+func (p *PhototSetImage) Convert() *generant.Image {
 	return &generant.Image{
 		"", p.Desc, "", p.URL,
-	}, nil
+	}
 }
 
-func (n *PhotoSet) ToMsg() (*generant.Message, error) {
+func (n *PhotoSet) Convert() (*generant.Message, error) {
 	var replys []generant.Reply
 	var imgs []*generant.Image
 
 	//process reply
 	for _, item := range n.Replys {
-		nReply, err := item.ToReply()
+		nReply, err := item.Convert()
 		if err != nil {
-			log.WithFields(log.Fields{
-				"time":  "fetch",
-				"reply": item,
-				"error": err.Error(),
-			}).Warning("error throwed when reply trans")
+			log.Warn(err.Error())
 			continue
 		}
 		replys = append(replys, nReply)
@@ -92,15 +98,7 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 
 	//process images
 	for _, item := range n.Images {
-		nImage, err := item.ToImage()
-		if err != nil {
-			log.WithFields(log.Fields{
-				"time":  "fetch",
-				"image": item,
-				"error": err.Error(),
-			}).Warning("error throwed when image trans")
-			continue
-		}
+		nImage := item.Convert()
 		imgs = append(imgs, nImage)
 	}
 	pubti, err := parseTime(n.PubTime)
@@ -124,26 +122,20 @@ func (n *PhotoSet) ToMsg() (*generant.Message, error) {
 		Images:      imgs,
 		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
-		ViewType:    n.ViewType,
-		Version:     "0.1",
+		ViewType:    generant.VIEW_TYPE_PICTURES,
 		Author:      authorNetEaseNews,
-		Priority:    n.Priority,
 	}, nil
 }
 
-func (n *News) ToMsg() (*generant.Message, error) {
+func (n *NormalNews) Convert() (*generant.Message, error) {
 	var replys []generant.Reply
 	var imgs []*generant.Image
 
 	//progress reply
 	for _, item := range n.Replys {
-		nReply, err := item.ToReply()
+		nReply, err := item.Convert()
 		if err != nil {
-			log.WithFields(log.Fields{
-				"time":  "fetch",
-				"reply": item,
-				"error": err.Error(),
-			}).Warning("error throwed when reply trans")
+			log.Warn(err.Error())
 			continue
 		}
 		replys = append(replys, nReply)
@@ -151,15 +143,7 @@ func (n *News) ToMsg() (*generant.Message, error) {
 
 	//progress imgages
 	for _, item := range n.Images {
-		nImage, err := item.ToImage()
-		if err != nil {
-			log.WithFields(log.Fields{
-				"time":  "fetch",
-				"image": item,
-				"error": err.Error(),
-			}).Warning("error throwed when image trans")
-			continue
-		}
+		nImage := item.Convert()
 
 		imgs = append(imgs, nImage)
 	}
@@ -185,11 +169,33 @@ func (n *News) ToMsg() (*generant.Message, error) {
 		Images:      imgs,
 		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
-		ViewType:    n.ViewType,
+		ViewType:    generant.VIEW_TYPE_NORMAL,
 		Version:     "0.1",
 		Author:      authorNetEaseNews,
-		Priority:    n.Priority,
 	}, nil
+}
+
+func (p *Topic)Convert() *generant.Topic {
+	result := make([]*generant.Message, len(p.Newss))
+
+	cnt := 0
+
+	for _, news := range p.Newss {
+		m, e := news.Convert()
+		if e != nil {
+			log.Warn(e.Error())
+			continue
+		}
+		result[cnt] = m
+		cnt++
+	}
+
+	return &generant.Topic{
+		Id:p.Id,
+		Title:p.Title,
+		Msgs:result[:cnt],
+		LastModify:time.Now().Unix(),
+	}
 }
 
 func init() {

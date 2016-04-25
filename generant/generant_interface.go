@@ -85,7 +85,7 @@ type Message struct {
 	Subtitle    string   `json:"subtitle"` //*
 	CoverImg    string   `json:"coverimg"` //if not have this field shoud be "" //*
 	Images      []*Image `json:"images"`
-	ReplyNumber int64     `json:"replynumber"`
+	ReplyNumber int64    `json:"replynumber"`
 	Replys      []Reply  `json:"replys"`
 	ViewType    int      `json:"viewtype"` //*
 	Topic       string   `json:"topic"`    //*
