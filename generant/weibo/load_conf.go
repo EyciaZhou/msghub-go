@@ -12,5 +12,5 @@ func LoadConf(raw []byte) ([]generant.GetNewer, error) {
 }
 
 func init() {
-	generant.Register("NeteaseNews", (generant.LoadConf)(LoadConf))
+	generant.Register("weibo", (generant.LoadConf)(LoadConf))
 }

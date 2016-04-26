@@ -5,6 +5,7 @@ import (
 	"github.com/EyciaZhou/msghub.go/Utiles"
 	"time"
 	"github.com/EyciaZhou/msghub.go/generant/netease_news/api"
+	"github.com/Sirupsen/logrus"
 )
 
 var (
@@ -18,7 +19,7 @@ func LoadConf(conf_bs []byte) ([]generant.GetNewer, error) {
 		return nil, Utiles.NewPanicError(err)
 	}
 
-	result := make([]generant.GetNewer, len(confs))
+	result := []generant.GetNewer{}
 	for _, conf := range confs {
 		delayTime_S := conf["delayBetweenCatchRound"]
 
@@ -46,7 +47,7 @@ func LoadConf(conf_bs []byte) ([]generant.GetNewer, error) {
 			}
 			gn = nenews_api.NewChannController(name, id, delayTime)
 		case "special":
-			id := conf["tipicId"]
+			id := conf["topicId"]
 			if id == "" {
 				return nil, Utiles.NewError("topicId is empty when type is special")
 			}
@@ -55,12 +56,15 @@ func LoadConf(conf_bs []byte) ([]generant.GetNewer, error) {
 			return nil, Utiles.NewError("not supported type of nenews conf")
 		}
 
+		logrus.Debug(gn)
 		result = append(result, gn)
 	}
+
+	logrus.Debug(result)
 
 	return result, nil
 }
 
 func init() {
-	generant.Register("weibo", (generant.LoadConf)(LoadConf))
+	generant.Register("NeteaseNews", (generant.LoadConf)(LoadConf))
 }
