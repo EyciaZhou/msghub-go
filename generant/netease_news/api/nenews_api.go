@@ -10,6 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"strings"
 	"github.com/EyciaZhou/msghub.go/generant"
+	"time"
 )
 
 func listURL(list string, page int) string {
@@ -208,6 +209,17 @@ type ChannController struct {
 
 	channName string
 	listId    string
+
+	delayTime time.Duration
+}
+
+func NewChannController(channName string, listId string, delayTime time.Duration) *ChannController {
+	return &ChannController{
+		BaseController{},
+		channName,
+		listId,
+		delayTime,
+	}
 }
 
 func (p *ChannController) apiGetNewsChannel(page int) (r *nenews_types.Topic, er error) {
@@ -240,10 +252,25 @@ func (p *ChannController) GetNew() (generant.CanConvertToTopic, error) {
 	return p.apiGetNewsChannel(0)
 }
 
+func (p *ChannController) DelayBetweenCatchRound() time.Duration {
+	return p.delayTime
+}
+
 type TopicController struct {
 	basic BaseController
 
 	specialId string
+
+	delayTime time.Duration
+}
+
+func NewTopicController(specialId string, delayTime time.Duration) *TopicController {
+	return &TopicController{
+		BaseController{},
+		specialId,
+
+		delayTime,
+	}
 }
 
 func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) {
@@ -283,4 +310,8 @@ func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) 
 
 func (p *TopicController) GetNew() (generant.CanConvertToTopic, error) {
 	return p.apiGetSpecialList()
+}
+
+func (p *TopicController) DelayBetweenCatchRound() time.Duration {
+	return p.delayTime
 }

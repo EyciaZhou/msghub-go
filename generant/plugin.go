@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"path"
 	"sync"
+	"time"
 )
 
 type LoadConf func(raw []byte) ([]GetNewer, error)
@@ -17,6 +18,8 @@ type CanConvertToTopic interface {
 
 type GetNewer interface {
 	GetNew() (CanConvertToTopic, error)
+
+	DelayBetweenCatchRound() time.Duration
 }
 
 var (

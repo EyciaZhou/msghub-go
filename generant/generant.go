@@ -77,7 +77,7 @@ func (p *Generant) Catch() {
 			}
 
 			select {
-			case <-time.After(60 * time.Second):
+			case <-time.After(p.GetNewer.DelayBetweenCatchRound()):
 			case <-p.forceStop:
 				return
 			}

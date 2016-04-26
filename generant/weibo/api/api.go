@@ -5,12 +5,14 @@ import (
 	"github.com/EyciaZhou/msghub.go/generant/weibo/types"
 	"net/url"
 	"github.com/EyciaZhou/msghub.go/generant"
+	"time"
 )
 
 const (
 	_URL_FRIENDS_TIMELINE = "https://api.weibo.com/2/statuses/friends_timeline.json"
 	_URL_ACCESS_TOKEN     = "https://api.weibo.com/oauth2/access_token"
 	_URL_GET_TOKEN_INFO   = "https://api.weibo.com/oauth2/get_token_info"
+	_DEFAULT_WEIBO_DELAY = time.Minute * 5
 )
 
 func (p *FriendsTimelineController) firstPage() ([]*weibo_types.Tweet, error) {
@@ -84,6 +86,10 @@ func NewFriendsTimelineController(token string, lstid string) *FriendsTimelineCo
 		token: token,
 		lstid: lstid,
 	}
+}
+
+func (p *FriendsTimelineController) DelayBetweenCatchRound() time.Duration {
+	return _DEFAULT_WEIBO_DELAY
 }
 
 func (p *FriendsTimelineController) GetNew() (generant.CanConvertToTopic, error) {
