@@ -186,6 +186,7 @@ func (p *Topic)Convert() *generant.Topic {
 			log.Warn(e.Error())
 			continue
 		}
+		m.Topic = p.Id
 		result[cnt] = m
 		cnt++
 	}

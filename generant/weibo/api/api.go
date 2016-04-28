@@ -6,19 +6,21 @@ import (
 	"net/url"
 	"github.com/EyciaZhou/msghub.go/generant"
 	"time"
+	"strconv"
 )
 
 const (
 	_URL_FRIENDS_TIMELINE = "https://api.weibo.com/2/statuses/friends_timeline.json"
 	_URL_ACCESS_TOKEN     = "https://api.weibo.com/oauth2/access_token"
 	_URL_GET_TOKEN_INFO   = "https://api.weibo.com/oauth2/get_token_info"
-	_DEFAULT_WEIBO_DELAY = time.Minute * 5
+	//_DEFAULT_WEIBO_DELAY = time.Minute * 10
+	//_FETCH_EACH = 100
 )
 
 func (p *FriendsTimelineController) firstPage() ([]*weibo_types.Tweet, error) {
 	args := url.Values{
 		"access_token": {p.token},
-		"count":        {"100"},
+		"count":        {strconv.Itoa(p.fetchEach)},
 	}
 
 	wtl := weibo_types.Timeline{}
@@ -51,6 +53,10 @@ func (p *FriendsTimelineController) since(SinceId string) ([]*weibo_types.Tweet,
 		SinceId = tweets_new[0].Idstr
 
 		tweets = append(tweets, tweets_new...)
+
+		if len(tweets_new) < p.fetchEach / 2 {
+			return tweets, nil
+		}
 	}
 }
 
@@ -58,7 +64,7 @@ func (p *FriendsTimelineController) pageFlip(SinceId string) ([]*weibo_types.Twe
 	args := url.Values{
 		"access_token": {p.token},
 		"since_id":     {SinceId},
-		"count":        {"100"},
+		"count":        {strconv.Itoa(p.fetchEach)},
 	}
 
 	wtl := weibo_types.Timeline{}
@@ -79,17 +85,22 @@ func (p *FriendsTimelineController) pageFlip(SinceId string) ([]*weibo_types.Twe
 type FriendsTimelineController struct {
 	token string
 	lstid string
+
+	delay time.Duration
+	fetchEach int
 }
 
-func NewFriendsTimelineController(token string, lstid string) *FriendsTimelineController {
+func NewFriendsTimelineController(token string, lstid string, delay time.Duration, fetchEach int) *FriendsTimelineController {
 	return &FriendsTimelineController{
 		token: token,
 		lstid: lstid,
+		delay: delay,
+		fetchEach: fetchEach,
 	}
 }
 
 func (p *FriendsTimelineController) DelayBetweenCatchRound() time.Duration {
-	return _DEFAULT_WEIBO_DELAY
+	return p.delay
 }
 
 func (p *FriendsTimelineController) GetNew() (generant.CanConvertToTopic, error) {

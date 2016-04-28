@@ -56,12 +56,8 @@ func LoadConf(conf_bs []byte) ([]generant.GetNewer, error) {
 			return nil, Utiles.NewError("not supported type of nenews conf")
 		}
 
-		logrus.Debug(gn)
 		result = append(result, gn)
 	}
-
-	logrus.Debug(result)
-
 	return result, nil
 }
 

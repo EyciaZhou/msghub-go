@@ -135,7 +135,7 @@ func (p *Tweet) Convert() (*generant.Message, error) {
 	result.Body = p.Text
 
 	if p.RetweetedStatus != nil {
-		result.Body += "//" + p.RetweetedStatus.Text
+		result.Body += "//@" + p.RetweetedStatus.User.Name +":" + p.RetweetedStatus.Text
 	}
 
 	result.Title = ""             //no title, replace with author's name

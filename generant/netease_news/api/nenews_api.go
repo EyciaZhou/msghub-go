@@ -33,6 +33,10 @@ func specialURL(id string) string {
 	return fmt.Sprintf("http://c.m.163.com/nc/special/%s.html", id)
 }
 
+const (
+	_SPECIA_URL_PREFIX = "nenews_specia_"
+)
+
 /*
 BaseController:
 	basic api
@@ -302,9 +306,9 @@ func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) 
 	}
 
 	return &nenews_types.Topic{
-		Id:    "nenews_specia_" + p.specialId,
+		Id:    _SPECIA_URL_PREFIX + p.specialId,
 		Title: infos["sname"].(string), //panic
-		Newss: []nenews_types.News{},
+		Newss: newss,
 	}, nil
 }
 

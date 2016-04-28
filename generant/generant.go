@@ -20,8 +20,9 @@ func NewGrenrant(getNewer GetNewer) *Generant {
 	}
 }
 
-func (p *Generant) catchOneTime(roundEnd chan bool) {
+func (p *Generant) catchOneTime(roundEnd chan struct{}) {
 	logrus.Info("start catch")
+	defer func(){roundEnd <- struct {}{}}()
 
 	FetchIsSucc := make(chan bool, 1)
 	var (
@@ -58,7 +59,6 @@ func (p *Generant) catchOneTime(roundEnd chan bool) {
 	if e != nil {
 		logrus.Errorf("Insert Topic[%s] into sql Error: %s", topic.Id, e.Error())
 	}
-	roundEnd <- true
 	logrus.Infof("%d catched", len(topic.Msgs))
 }
 
@@ -66,7 +66,7 @@ func (p *Generant) Catch() {
 	go func() {
 		defer func() {close(p.exited)}()
 
-		oneCatchEnded := make(chan bool, 1)
+		oneCatchEnded := make(chan struct{}, 1)
 		for {
 			go p.catchOneTime(oneCatchEnded)
 
