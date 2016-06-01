@@ -1,9 +1,9 @@
 package nenews_types
 
-import "github.com/EyciaZhou/msghub.go/generant"
+import "github.com/EyciaZhou/msghub.go/interface"
 
 type News interface {
-	Convert() (*generant.Message, error)
+	Convert() (*Interface.Message, error)
 }
 
 type Topic struct {

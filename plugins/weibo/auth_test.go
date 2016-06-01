@@ -2,6 +2,7 @@ package weibo
 
 import (
 	"encoding/json"
+	"github.com/EyciaZhou/msghub.go/plugins/weibo/types"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ var testTweet = `
 
 func TestGetSource(t *testing.T) {
 	var (
-		tweet weiboTweet
+		tweet weibo_types.Tweet
 	)
 	err := json.Unmarshal(([]byte)(testTweet), &tweet)
 	if err != nil {

@@ -1,15 +1,15 @@
 package nenews_api
 
 import (
-//"encoding/json"
+	//"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/EyciaZhou/msghub.go/Utiles"
-	"github.com/EyciaZhou/msghub.go/generant/netease_news/types"
-	"github.com/EyciaZhou/msghub.go/generant/utils"
+	"github.com/EyciaZhou/msghub.go/ErrorUtiles"
+	"github.com/EyciaZhou/msghub.go/HttpUtils"
+	"github.com/EyciaZhou/msghub.go/interface"
+	"github.com/EyciaZhou/msghub.go/plugins/netease_news/types"
 	log "github.com/Sirupsen/logrus"
 	"strings"
-	"github.com/EyciaZhou/msghub.go/generant"
 	"time"
 )
 
@@ -38,22 +38,15 @@ const (
 )
 
 /*
-BaseController:
-	basic api
- */
-type BaseController struct {
-}
-
-/*
-apiGetNewsReply:
+Reply:
 	get news reply by (id, boardId)
- */
-func (p BaseController) apiGetNewsReply(id string, boardId string) ([]nenews_types.Reply, error) {
+*/
+func Reply(id string, boardId string) ([]nenews_types.Reply, error) {
 	//pass reply
 	return []nenews_types.Reply{}, nil
 
 	var c nenews_types.Reply_tmp
-	err := generant_utils.RequestToJson("GET", replyURL(id, boardId), nil, &c)
+	err := HttpUtils.Json("GET", replyURL(id, boardId), nil, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -62,15 +55,15 @@ func (p BaseController) apiGetNewsReply(id string, boardId string) ([]nenews_typ
 }
 
 /*
-apiGetNormalNews:
+NormalNews:
 	get full information about a normal news by its basic information
 	basic information in key-value format
- */
-func (p BaseController) apiGetNormalNews(item map[string]interface{}) (r *nenews_types.NormalNews, er error) {
+*/
+func NormalNews(item map[string]interface{}) (r *nenews_types.NormalNews, er error) {
 	defer func() {
 		if err := recover(); err != nil {
 			r = nil
-			er = Utiles.NewPanicError(err.(error))
+			er = ErrorUtiles.NewPanicError(err.(error))
 		}
 	}()
 
@@ -79,15 +72,15 @@ func (p BaseController) apiGetNormalNews(item map[string]interface{}) (r *nenews
 
 	//get content
 	var c map[string]*nenews_types.NormalNews
-	err := generant_utils.RequestToJson("GET", contentURL(id), nil, &c)
+	err := HttpUtils.Json("GET", contentURL(id), nil, &c)
 	if err != nil {
 		return nil, err
 	}
 
-	content := c[id]//panic
+	content := c[id] //panic
 
 	//get comment
-	reply, e := p.apiGetNewsReply(id, content.BoardId)
+	reply, e := Reply(id, content.BoardId)
 	if e != nil {
 		return nil, errors.New(fmt.Sprintf("get news reply error, ERROR:[%v]", e.Error()))
 	}
@@ -105,15 +98,15 @@ func (p BaseController) apiGetNormalNews(item map[string]interface{}) (r *nenews
 }
 
 /*
-apiGetPhotosetNews:
+PhotosetNews:
 	get full information about a photo set news by its basic information
 	basic information in key-value format
- */
-func (p BaseController) apiGetPhotosetNews(item map[string]interface{}) (r *nenews_types.PhotoSet, er error) {
+*/
+func PhotosetNews(item map[string]interface{}) (r *nenews_types.PhotoSet, er error) {
 	defer func() {
 		if err := recover(); err != nil {
 			r = nil
-			er = Utiles.NewPanicError(err.(error))
+			er = ErrorUtiles.NewPanicError(err.(error))
 		}
 	}()
 
@@ -127,13 +120,13 @@ func (p BaseController) apiGetPhotosetNews(item map[string]interface{}) (r *nene
 
 	//get info
 	var content nenews_types.PhotoSet
-	err := generant_utils.RequestToJson("GET", photoContentURL(pid_parted[0][4:], pid_parted[1]), nil, &content)
+	err := HttpUtils.Json("GET", photoContentURL(pid_parted[0][4:], pid_parted[1]), nil, &content)
 	if err != nil {
 		return nil, err
 	}
 
 	//get comment
-	reply, err := p.apiGetNewsReply(content.ID, content.BoardId)
+	reply, err := Reply(content.ID, content.BoardId)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("get news reply error, ERROR:[%s]", err.Error()))
 	}
@@ -147,7 +140,7 @@ func (p BaseController) apiGetPhotosetNews(item map[string]interface{}) (r *nene
 	return &content, nil
 }
 
-func (p BaseController) transArrayOfInterfaceToArrayOfMap(interfaces []interface{}) []map[string]interface{} {
+func transArrayOfInterfaceToArrayOfMap(interfaces []interface{}) []map[string]interface{} {
 	maps := make([]map[string]interface{}, len(interfaces))
 	cnt := 0
 	for i, _ := range interfaces {
@@ -165,8 +158,8 @@ parseNewsList:
 	struct format because of body info are not
 	included in basic info, so there will a additional
 	network request for each news.
- */
-func (p BaseController) parseNewsList(baseInfoList []map[string]interface{}) ([]nenews_types.News, error) {
+*/
+func parseNewsList(baseInfoList []map[string]interface{}) ([]nenews_types.News, error) {
 	var (
 		err     error
 		result  []nenews_types.News
@@ -182,7 +175,7 @@ func (p BaseController) parseNewsList(baseInfoList []map[string]interface{}) ([]
 			} else {
 				switch skipTyp {
 				case "photoset":
-					content, err = p.apiGetPhotosetNews(item)
+					content, err = PhotosetNews(item)
 				case "special":
 					//TODO
 					continue
@@ -192,7 +185,7 @@ func (p BaseController) parseNewsList(baseInfoList []map[string]interface{}) ([]
 				}
 			}
 		} else {
-			content, err = p.apiGetNormalNews(item)
+			content, err = NormalNews(item)
 		}
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -209,8 +202,6 @@ func (p BaseController) parseNewsList(baseInfoList []map[string]interface{}) ([]
 }
 
 type ChannController struct {
-	basic BaseController
-
 	channName string
 	listId    string
 
@@ -219,7 +210,6 @@ type ChannController struct {
 
 func NewChannController(channName string, listId string, delayTime time.Duration) *ChannController {
 	return &ChannController{
-		BaseController{},
 		channName,
 		listId,
 		delayTime,
@@ -230,17 +220,17 @@ func (p *ChannController) apiGetNewsChannel(page int) (r *nenews_types.Topic, er
 	defer func() {
 		if err := recover(); err != nil {
 			r = nil
-			er = Utiles.NewPanicError(err.(error))
+			er = ErrorUtiles.NewPanicError(err.(error))
 		}
 	}()
 
 	var v map[string]([]map[string]interface{})
-	err := generant_utils.RequestToJson("GET", listURL(p.listId, page), nil, &v)
+	err := HttpUtils.Json("GET", listURL(p.listId, page), nil, &v)
 	if err != nil {
 		return nil, err
 	}
 
-	newss, err := p.basic.parseNewsList(v[p.listId])	//panic
+	newss, err := parseNewsList(v[p.listId]) //panic
 	if err != nil {
 		return nil, err
 	}
@@ -252,8 +242,12 @@ func (p *ChannController) apiGetNewsChannel(page int) (r *nenews_types.Topic, er
 	}, nil
 }
 
-func (p *ChannController) GetNew() (generant.CanConvertToTopic, error) {
-	return p.apiGetNewsChannel(0)
+func (p *ChannController) GetNew() (*Interface.Topic, error) {
+	ne_topic, err := p.apiGetNewsChannel(0)
+	if err != nil {
+		return nil, err
+	}
+	return ne_topic.Convert(), nil
 }
 
 func (p *ChannController) DelayBetweenCatchRound() time.Duration {
@@ -261,8 +255,6 @@ func (p *ChannController) DelayBetweenCatchRound() time.Duration {
 }
 
 type TopicController struct {
-	basic BaseController
-
 	specialId string
 
 	delayTime time.Duration
@@ -270,9 +262,7 @@ type TopicController struct {
 
 func NewTopicController(specialId string, delayTime time.Duration) *TopicController {
 	return &TopicController{
-		BaseController{},
 		specialId,
-
 		delayTime,
 	}
 }
@@ -281,24 +271,24 @@ func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) 
 	defer func() {
 		if err := recover(); err != nil {
 			r = nil
-			er = Utiles.NewPanicError(err.(error))
+			er = ErrorUtiles.NewPanicError(err.(error))
 		}
 	}()
 
 	var v map[string](map[string]interface{})
-	err := generant_utils.RequestToJson("GET", specialURL(p.specialId), nil, &v)
+	err := HttpUtils.Json("GET", specialURL(p.specialId), nil, &v)
 	if err != nil {
 		return nil, err
 	}
 
-	infos := v[p.specialId]                                                        //panic
-	topics := p.basic.transArrayOfInterfaceToArrayOfMap(infos["topics"].([]interface{})) //panic^3
+	infos := v[p.specialId]                                                      //panic
+	topics := transArrayOfInterfaceToArrayOfMap(infos["topics"].([]interface{})) //panic^3
 
 	newss := []nenews_types.News{}
 
 	//a special including some topics
 	for _, t := range topics {
-		msgs, err := p.basic.parseNewsList(p.basic.transArrayOfInterfaceToArrayOfMap(t["docs"].([]interface{}))) //panic
+		msgs, err := parseNewsList(transArrayOfInterfaceToArrayOfMap(t["docs"].([]interface{}))) //panic
 		if err != nil {
 			return nil, err
 		}
@@ -312,8 +302,12 @@ func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) 
 	}, nil
 }
 
-func (p *TopicController) GetNew() (generant.CanConvertToTopic, error) {
-	return p.apiGetSpecialList()
+func (p *TopicController) GetNew() (*Interface.Topic, error) {
+	topic, err := p.apiGetSpecialList()
+	if err != nil {
+		return nil, err
+	}
+	return topic.Convert(), nil
 }
 
 func (p *TopicController) DelayBetweenCatchRound() time.Duration {

@@ -1,8 +1,8 @@
-package Utiles
+package ErrorUtiles
 
 import (
-	"runtime/debug"
 	"errors"
+	"runtime/debug"
 )
 
 var (

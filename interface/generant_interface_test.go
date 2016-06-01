@@ -1,4 +1,4 @@
-package generant
+package Interface
 
 import (
 	"testing"

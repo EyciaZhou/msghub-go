@@ -1,19 +1,22 @@
 package main
 
 import (
-	"github.com/EyciaZhou/msghub.go/Utiles"
-	"github.com/EyciaZhou/msghub.go/generant"
-	_ "github.com/EyciaZhou/msghub.go/generant/netease_news"
-	_ "github.com/EyciaZhou/msghub.go/generant/weibo"
+	"github.com/EyciaZhou/msghub.go/ErrorUtiles"
+	"github.com/EyciaZhou/msghub.go/interface"
+	"github.com/EyciaZhou/msghub.go/plugins"
+	_ "github.com/EyciaZhou/msghub.go/plugins/netease_news"
+	_ "github.com/EyciaZhou/msghub.go/plugins/rss"
+	_ "github.com/EyciaZhou/msghub.go/plugins/weibo"
 	"github.com/Sirupsen/logrus"
 	"time"
 )
 
 func main() {
-	Utiles.OUTPUT_STACK_ON_ERROR = true
+	ErrorUtiles.OUTPUT_STACK_ON_ERROR = true
 	logrus.SetLevel(logrus.DebugLevel)
 
-	generant.Init()
+	Interface.Init()
+	plugins.Init()
 
 	for {
 		time.Sleep(time.Second)

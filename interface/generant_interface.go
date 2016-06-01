@@ -1,14 +1,13 @@
-package generant
+package Interface
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/EyciaZhou/configparser"
+	"github.com/EyciaZhou/picRouter/PicPipe"
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/zbindenren/logrus_mail"
-	"time"
 )
 
 const (
@@ -63,7 +62,7 @@ type Image struct {
 	URL   string `json:"url"`
 }
 
-func (img *Image) InsertIntoQueue() (int64, error) {
+func (img *Image) InsertIntoQueue() (string, error) {
 	return insertImgUrlIntoQueue(img.URL)
 }
 
@@ -97,7 +96,7 @@ type Message struct {
 
 func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	//insert cover img
-	var coverImgId sql.NullInt64
+	var coverImgId sql.NullString
 
 	err := m.Author.InsertIntoSQL()
 	if err != nil {
@@ -106,7 +105,7 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 
 	if m.CoverImg != "" {
 		var err error
-		coverImgId.Int64, err = insertImgUrlIntoQueue(m.CoverImg)
+		coverImgId.String, err = insertImgUrlIntoQueue(m.CoverImg)
 		if err != nil {
 			return nil, err
 		}
@@ -171,44 +170,22 @@ func (t *Topic) InsertIntoSQL() error {
 	return nil
 }
 
-func isUrl(ur string) bool {
-	//TODO: judge the domain
-	return true
-}
+var (
+	picQueue pic.PicTaskPipe
+)
 
-func insertImgUrlIntoQueue(url string) (int64, error) {
-	if isUrl(url) {
-		res, err := StmtInsertImgToQueue.Exec(url, url)
-
-		if err != nil {
-			log.WithField("url", url).Error("Error when exec InsertImgToQueue's STMT, REASON : " + err.Error())
-			return 0, err
-		}
-
-		rc, _ := res.RowsAffected()
-		if rc != 1 {
-			//duplicate
-			var pid int64
-			row := StmtSelectPidFromURL.QueryRow(url)
-			err = row.Scan(&pid)
-			if err != nil {
-				return 0, err
-			}
-			return pid, nil
-		}
-		//inserted
-		return res.LastInsertId()
+func insertImgUrlIntoQueue(url string) (string, error) {
+	task, err := picQueue.UpsertTask(url)
+	if err != nil {
+		return "", err
 	}
-
-	return 0, ErrorNotInvaildURL
+	return task.Key, nil
 }
 
 var (
 	db                   *sql.DB
 	StmtInsert           *sql.Stmt
 	StmtInsertRef        *sql.Stmt
-	StmtInsertImgToQueue *sql.Stmt
-	StmtSelectPidFromURL *sql.Stmt
 	StmtSelectMidFromURL *sql.Stmt
 	StmtTopicInsert      *sql.Stmt
 
@@ -216,17 +193,6 @@ var (
 )
 
 type config_t struct {
-	MailEnabled         bool   `default:"false"`
-	MailApplicationName string `default:"Generant_Interface"`
-	MailSMTPAddress     string `default:"127.0.0.1"`
-	MailSMTPPort        int    `default:"25"`
-	MailFrom            string `default:"root@eycia.me"`
-	MailTo              string `default:"zhou.eycia@gmail.com"`
-
-	MailUsername string `default:"nomailusername"`
-	MailPassword string `default:"nomailpassword"`
-
-	QueueTableName  string `default:"pic_task_queue"`
 	PicRefTableName string `default:"picref"`
 	MsgTableName    string `default:"msg"`
 	TopicTableName  string `default:"topic"`
@@ -236,61 +202,24 @@ type config_t struct {
 	DBName     string `default:"msghub"`
 	DBUsername string `default:"root"`
 	DBPassword string `default:"fmttm233"`
-
-	ConfDir         string
-	ConfFileNames   []string
-	ConfPluginNames []string
 }
 
 var (
 	config config_t
 )
 
-func loadConfig() error {
-	pluginsMu.Lock()
-	defer pluginsMu.Unlock()
-
-	var err error
-
-	configparser.AutoLoadConfig("generant", &config)
+func loadConfig() {
+	configparser.AutoLoadConfig("interface", &config)
 	configparser.ToJson(&config)
-
-	return err
 }
 
 func Init() {
 	log.Info("Start Load Config")
-	err := loadConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	//process log's mail sending
-	/*
-		mailhook, err := logrus_mail.NewMailHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo)
-		if err == nil {
-			log.AddHook(mailhook)
-		} else {
-			log.Error("Can't Hook mail, ERROR:", err.Error())
-		}
-	*/
-
-	if config.MailEnabled {
-		log.Info("Start Bind Mail Hook")
-		mailhook_auth, err := logrus_mail.NewMailAuthHook(config.MailApplicationName, config.MailSMTPAddress, config.MailSMTPPort, config.MailFrom, config.MailTo,
-			config.MailUsername, config.MailPassword)
-
-		if err == nil {
-			log.AddHook(mailhook_auth)
-			log.Error("Don't Worry, just for send a email to test")
-		} else {
-			log.Panic("Can't Hook mail, ERROR:", err.Error())
-		}
-	}
+	loadConfig()
 
 	log.Info("Start Connect mysql")
 	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?collation=utf8mb4_general_ci", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
-	db, err = sql.Open("mysql", url)
+	db, err := sql.Open("mysql", url)
 	if err != nil {
 		log.Panic("Can't Connect DB REASON : " + err.Error())
 		return
@@ -301,6 +230,12 @@ func Init() {
 		return
 	}
 	log.Info("connected")
+
+	picQueue = pic.NewMySQLPicPipeUseConnectedDB(db)
+	if err != nil {
+		log.Panic("Can't Connect DB REASON : " + err.Error())
+		return
+	}
 
 	log.Info("Start prepare stmt")
 	StmtInsert, err = db.Prepare(fmt.Sprintf(
@@ -348,34 +283,6 @@ func Init() {
 		return
 	}
 
-	StmtInsertImgToQueue, err = db.Prepare(fmt.Sprintf(`
-	INSERT INTO
-			%s (url, status, owner)
-		SELECT
-				?, 0, 0
-			FROM DUAL
-			WHERE NOT EXISTS (SELECT 1 FROM %s WHERE url=?);
-	`, config.QueueTableName, config.QueueTableName))
-	/*
-		StmtInsertImgToQueue, err = db.Prepare(fmt.Sprintf(`
-		INSERT INTO
-				%s (url, status)
-			VALUES
-				(?,?);`, config.QueueTableName))*/
-	if err != nil {
-		log.Panic(err.Error())
-		return
-	}
-
-	StmtSelectPidFromURL, err = db.Prepare(fmt.Sprintf(`
-	SELECT id FROM %s
-		WHERE url=?;
-	`, config.QueueTableName))
-	if err != nil {
-		log.Panic(err.Error())
-		return
-	}
-
 	StmtSelectMidFromURL, err = db.Prepare(fmt.Sprintf(`
 	SELECT id FROM %s
 		WHERE SourceURL=?;
@@ -384,20 +291,4 @@ func Init() {
 		log.Panic(err.Error())
 		return
 	}
-
-	log.Info("Start load plugins's config")
-	err = loadPluginConfig()
-	if err != nil {
-		log.Panic(err.Error())
-	}
-
-	log.Infof("Start fire plugins, %d plugins to fire", len(generants))
-	for i, gen := range generants {
-		log.Infof("[%d/%d]...", i+1, len(generants))
-		go gen.Catch()
-		log.Info("fired and start delay")
-		time.Sleep(10 * time.Second)
-	}
-
-	log.Info("Init finished")
 }

@@ -1,8 +1,9 @@
-package generant
+package plugins
 
 import (
 	"errors"
 	"fmt"
+	"github.com/EyciaZhou/msghub.go/interface"
 	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"path"
@@ -12,33 +13,29 @@ import (
 
 type LoadConf func(raw []byte) ([]GetNewer, error)
 
-type CanConvertToTopic interface {
-	Convert() *Topic
-}
-
 type GetNewer interface {
-	GetNew() (CanConvertToTopic, error)
+	GetNew() (*Interface.Topic, error)
 
 	DelayBetweenCatchRound() time.Duration
 }
 
 var (
-	pluginsMu    sync.Mutex
-	regedPlugins = make(map[string]LoadConf)
+	pluginsMu       sync.Mutex
+	RegistedPlugins = make(map[string]LoadConf)
 
-	generants []*Generant
+	pluginRunners []*pluginRunner
 )
 
 func Register(name string, fLoadConf LoadConf) {
 	pluginsMu.Lock()
 	defer pluginsMu.Unlock()
 
-	regedPlugins[name] = fLoadConf
+	RegistedPlugins[name] = fLoadConf
 }
 
 func loadPluginConfig() error {
 	//
-	if generants != nil && len(generants) > 0 {
+	if pluginRunners != nil && len(pluginRunners) > 0 {
 		return errors.New("can't load config twice")
 	}
 
@@ -46,7 +43,7 @@ func loadPluginConfig() error {
 		return errors.New("the length of ConfFileNames and ConfPluginNames not same")
 	}
 
-	generants = []*Generant{}
+	pluginRunners = []*pluginRunner{}
 
 	config.ConfDir = path.Clean(config.ConfDir)
 
@@ -59,7 +56,7 @@ func loadPluginConfig() error {
 			return err
 		}
 
-		if plugin, hv := regedPlugins[config.ConfPluginNames[i]]; !hv {
+		if plugin, hv := RegistedPlugins[config.ConfPluginNames[i]]; !hv {
 			return errors.New("Doesn't registed Plugin : " + config.ConfPluginNames[i])
 		} else {
 			gns, err := plugin(bs)
@@ -67,7 +64,7 @@ func loadPluginConfig() error {
 				return fmt.Errorf("Error when load %d th plugin : %s", i+1, err.Error())
 			}
 			for _, gn := range gns {
-				generants = append(generants, NewGrenrant(gn))
+				pluginRunners = append(pluginRunners, NewPluginRunner(gn))
 			}
 		}
 	}

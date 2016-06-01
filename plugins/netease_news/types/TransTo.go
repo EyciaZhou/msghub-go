@@ -2,7 +2,7 @@ package nenews_types
 
 import (
 	"errors"
-	"github.com/EyciaZhou/msghub.go/generant"
+	"github.com/EyciaZhou/msghub.go/interface"
 	log "github.com/Sirupsen/logrus"
 	"strconv"
 	"time"
@@ -15,7 +15,7 @@ var (
 )
 
 var (
-	authorNetEaseNews = &generant.Author{
+	authorNetEaseNews = &Interface.Author{
 		Uid:         "NetEaseNews",
 		Name:        "网易新闻",
 		CoverSource: "http://www.apk20.com/image/icon-385074",
@@ -30,11 +30,11 @@ func parseTime(ts string) (int64, error) {
 	return ti.Unix(), nil
 }
 
-func (r Reply) Convert() (generant.Reply, error) {
+func (r Reply) Convert() (Interface.Reply, error) {
 	var e error
 
 	length := len(r)
-	reply := make(generant.Reply, length)
+	reply := make(Interface.Reply, length)
 
 	cnt := 0
 	for i := 1; i <= length; i++ {
@@ -58,7 +58,7 @@ func (r Reply) Convert() (generant.Reply, error) {
 			}
 		}
 
-		reply[cnt] = &generant.ReplyFloor{
+		reply[cnt] = &Interface.ReplyFloor{
 			Floor:   i,
 			Time:    ti,
 			Name:    r[id].Name,
@@ -70,21 +70,21 @@ func (r Reply) Convert() (generant.Reply, error) {
 	return reply, nil
 }
 
-func (p *NewsImage) Convert() *generant.Image {
-	return &generant.Image{
+func (p *NewsImage) Convert() *Interface.Image {
+	return &Interface.Image{
 		p.Ref, p.Title, p.Size, p.URL,
 	}
 }
 
-func (p *PhototSetImage) Convert() *generant.Image {
-	return &generant.Image{
+func (p *PhototSetImage) Convert() *Interface.Image {
+	return &Interface.Image{
 		"", p.Desc, "", p.URL,
 	}
 }
 
-func (n *PhotoSet) Convert() (*generant.Message, error) {
-	var replys []generant.Reply
-	var imgs []*generant.Image
+func (n *PhotoSet) Convert() (*Interface.Message, error) {
+	var replys []Interface.Reply
+	var imgs []*Interface.Image
 
 	//process reply
 	for _, item := range n.Replys {
@@ -111,7 +111,7 @@ func (n *PhotoSet) Convert() (*generant.Message, error) {
 		snapti = time.Now().Unix()
 	}
 
-	return &generant.Message{
+	return &Interface.Message{
 		SnapTime:    snapti,
 		PubTime:     pubti,
 		Source:      n.URL,
@@ -122,14 +122,14 @@ func (n *PhotoSet) Convert() (*generant.Message, error) {
 		Images:      imgs,
 		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
-		ViewType:    generant.VIEW_TYPE_PICTURES,
+		ViewType:    Interface.VIEW_TYPE_PICTURES,
 		Author:      authorNetEaseNews,
 	}, nil
 }
 
-func (n *NormalNews) Convert() (*generant.Message, error) {
-	var replys []generant.Reply
-	var imgs []*generant.Image
+func (n *NormalNews) Convert() (*Interface.Message, error) {
+	var replys []Interface.Reply
+	var imgs []*Interface.Image
 
 	//progress reply
 	for _, item := range n.Replys {
@@ -158,7 +158,7 @@ func (n *NormalNews) Convert() (*generant.Message, error) {
 		snapti = time.Now().Unix()
 	}
 
-	return &generant.Message{
+	return &Interface.Message{
 		SnapTime:    snapti,
 		PubTime:     pubti,
 		Source:      n.URL,
@@ -169,14 +169,14 @@ func (n *NormalNews) Convert() (*generant.Message, error) {
 		Images:      imgs,
 		ReplyNumber: (int64)(n.ReplyCount),
 		Replys:      replys,
-		ViewType:    generant.VIEW_TYPE_NORMAL,
+		ViewType:    Interface.VIEW_TYPE_NORMAL,
 		Version:     "0.1",
 		Author:      authorNetEaseNews,
 	}, nil
 }
 
-func (p *Topic)Convert() *generant.Topic {
-	result := make([]*generant.Message, len(p.Newss))
+func (p *Topic) Convert() *Interface.Topic {
+	result := make([]*Interface.Message, len(p.Newss))
 
 	cnt := 0
 
@@ -191,11 +191,11 @@ func (p *Topic)Convert() *generant.Topic {
 		cnt++
 	}
 
-	return &generant.Topic{
-		Id:p.Id,
-		Title:p.Title,
-		Msgs:result[:cnt],
-		LastModify:time.Now().Unix(),
+	return &Interface.Topic{
+		Id:         p.Id,
+		Title:      p.Title,
+		Msgs:       result[:cnt],
+		LastModify: time.Now().Unix(),
 	}
 }
 

@@ -1,7 +1,7 @@
 package weibo_types
 
 import (
-	"github.com/EyciaZhou/msghub.go/generant"
+	"github.com/EyciaZhou/msghub.go/interface"
 	"github.com/Sirupsen/logrus"
 	"strings"
 	"time"
@@ -40,8 +40,8 @@ type Timeline struct {
 
 type Tweets []*Tweet
 
-func (p Tweets) Convert() *generant.Topic {
-	result := make([]*generant.Message, len(p))
+func (p Tweets) Convert() *Interface.Topic {
+	result := make([]*Interface.Message, len(p))
 
 	cnt := 0
 
@@ -55,7 +55,7 @@ func (p Tweets) Convert() *generant.Topic {
 		cnt++
 	}
 
-	return &generant.Topic{
+	return &Interface.Topic{
 		"weibo_friendsline",
 		"weibo",
 		result[:cnt],
@@ -99,14 +99,14 @@ func (p *Tweet) GetSource() string {
 	return "http://weibo.com/" + p.User.Idstr + "/" + p.getMidBase62()
 }
 
-func (p PicUrls) Convert() []*generant.Image {
+func (p PicUrls) Convert() []*Interface.Image {
 	if p == nil {
 		return nil
 	}
 
-	result := make([]*generant.Image, len(p))
+	result := make([]*Interface.Image, len(p))
 	for index, img_from := range p {
-		result[index] = &generant.Image{
+		result[index] = &Interface.Image{
 			URL: strings.Replace(img_from.ThumbnailPic, "thumbnail", "large", 1), //covert to big picture
 		}
 	}
@@ -114,16 +114,16 @@ func (p PicUrls) Convert() []*generant.Image {
 	return result
 }
 
-func (p *User) Convert() *generant.Author {
-	return &generant.Author{
+func (p *User) Convert() *Interface.Author {
+	return &Interface.Author{
 		Name:        p.Name,
 		Uid:         "weibo_" + p.Idstr,
 		CoverSource: p.CoverImage,
 	}
 }
 
-func (p *Tweet) Convert() (*generant.Message, error) {
-	result := &generant.Message{}
+func (p *Tweet) Convert() (*Interface.Message, error) {
+	result := &Interface.Message{}
 
 	pubtime, err := time.Parse(weiboTimeLayout, p.CreatedAt)
 	if err != nil {
@@ -135,14 +135,20 @@ func (p *Tweet) Convert() (*generant.Message, error) {
 	result.Body = p.Text
 
 	if p.RetweetedStatus != nil {
-		result.Body += "//@" + p.RetweetedStatus.User.Name +":" + p.RetweetedStatus.Text
+		result.Body += "//"
+
+		if p.RetweetedStatus.User != nil {
+			result.Body += "@" + p.RetweetedStatus.User.Name + ":"
+		}
+
+		result.Body += p.RetweetedStatus.Text
 	}
 
 	result.Title = ""             //no title, replace with author's name
 	result.Subtitle = result.Body //display on first screen
 	result.ReplyNumber = p.CommentsCount
 	result.Replys = nil //TODO
-	result.ViewType = generant.VIEW_TYPE_PICTURES
+	result.ViewType = Interface.VIEW_TYPE_PICTURES
 	result.Topic = "weibo_friendsline"
 	result.Author = p.User.Convert()
 	result.Tag = "" //TODO
