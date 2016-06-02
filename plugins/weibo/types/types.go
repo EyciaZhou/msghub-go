@@ -116,9 +116,9 @@ func (p PicUrls) Convert() []*Interface.Image {
 
 func (p *User) Convert() *Interface.Author {
 	return &Interface.Author{
-		Name:        p.Name,
-		Uid:         "weibo_" + p.Idstr,
-		CoverSource: p.CoverImage,
+		Name:      p.Name,
+		Uid:       "weibo_" + p.Idstr,
+		AvatarUrl: p.CoverImage,
 	}
 }
 
@@ -146,8 +146,8 @@ func (p *Tweet) Convert() (*Interface.Message, error) {
 
 	result.Title = ""             //no title, replace with author's name
 	result.Subtitle = result.Body //display on first screen
-	result.ReplyNumber = p.CommentsCount
-	result.Replys = nil //TODO
+	//	result.ReplyNumber = p.CommentsCount
+	//	result.Replys = nil //TODO
 	result.ViewType = Interface.VIEW_TYPE_PICTURES
 	result.Topic = "weibo_friendsline"
 	result.Author = p.User.Convert()

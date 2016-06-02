@@ -1,7 +1,8 @@
-package rss_api
+package rss
 
 import (
 	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/EyciaZhou/msghub.go/interface"
@@ -31,13 +32,16 @@ func (p *feed) TransTo() (*Interface.Topic, error) {
 		return nil, errors.New("Link is empty")
 	}
 	result := new(Interface.Topic)
-	result.Id = "rss_" + (string)(md5.Sum(p.Link))
+
+	_hash_link := md5.Sum(([]byte)(p.Link))
+
+	result.Id = "rss_" + hex.EncodeToString(_hash_link[:])
 	result.Title = p.Title
 
-	msgs := make([]*Interface.Message{}, len(p.Items))
+	msgs := make([]*Interface.Message, len(p.Items))
 
 	author := &Interface.Author{}
-	author.CoverSource = p.Image.Url
+	author.AvatarUrl = p.Image.Url
 	author.Name = p.Nickname
 	author.Uid = result.Id + "_" + author.Name
 
@@ -49,7 +53,7 @@ func (p *feed) TransTo() (*Interface.Topic, error) {
 			continue
 		}
 
-		next := make(Interface.Message)
+		next := new(Interface.Message)
 		next.SnapTime = item.Date.Unix()
 		next.PubTime = item.Date.Unix()
 		next.Source = item.Link
@@ -62,7 +66,7 @@ func (p *feed) TransTo() (*Interface.Topic, error) {
 		next.Topic = result.Id
 		next.Tag = ""
 		next.Author = author
-		next.Priority = 0
+		//		next.Priority = 0
 
 		if next.SnapTime > lstModify {
 			lstModify = next.SnapTime
@@ -75,16 +79,16 @@ func (p *feed) TransTo() (*Interface.Topic, error) {
 	result.LastModify = lstModify
 	result.Msgs = msgs[:cnt]
 
-	return result
+	return result, nil
 }
 
-func (p *RssController) GetNew() (Interface.Topic, error) {
+func (p *RssController) GetNew() (*Interface.Topic, error) {
 	_feed, err := rss.Fetch(p.Url)
 	if err != nil {
 		return nil, err
 	}
 	p.delayBetweenCatchRound = _feed.Refresh.Sub(time.Now())
-	return (feed)(_feed).TransTo(), nil
+	return (*feed)(_feed).TransTo()
 }
 
 func (p *RssController) DelayBetweenCatchRound() time.Duration {
@@ -108,7 +112,14 @@ func LoadConf(conf_bs []byte) ([]plugins.GetNewer, error) {
 	for i := 0; i < len(confs); i++ {
 		confs[i].delayBetweenCatchRound = time.Minute * 10
 	}
-	return confs, nil
+
+	plugins := make([]plugins.GetNewer, len(confs))
+
+	for i, conf := range confs {
+		plugins[i] = conf
+	}
+
+	return plugins, nil
 }
 
 func init() {

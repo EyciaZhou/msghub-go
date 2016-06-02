@@ -11,28 +11,48 @@ import (
 )
 
 const (
-	VIEW_TYPE_NORMAL   = 1
+	//VIEW_TYPE_NORMAL:
+	//	some thing like a news, and some pictures inset the content
+	VIEW_TYPE_NORMAL = 1
+
+	//VIEW_TYPE_PICTURES:
+	//	some thing like tweet,
+	//	have series of picture. but short, can avoiding body content.
 	VIEW_TYPE_PICTURES = 2
 )
 
+//Author:
+//	Name: name to display
+//	Uid: uuid of this author, recommend using PLUGIN-NAME{_TOPIC-NAME}_AUTHOR-NAME
+//	AvatarUrl: url of Author's avatar
 type Author struct {
-	Name        string `json:"name"`
-	Uid         string `json:"uid"`
-	CoverSource string `json:"covert_source"`
+	Name      string `json:"name"`
+	Uid       string `json:"uid"`
+	AvatarUrl string `json:"covert_source"` //can empty
 }
 
+//InsertIntoSQL:
+//	Insert this author to sql database,
+//	throw error if the author is null, or some error sql caused
 func (t *Author) InsertIntoSQL() error {
 	if t == nil {
 		return errors.New("null author")
 	}
 
-	pid, err := insertImgUrlIntoQueue(t.CoverSource)
+	pid := sql.NullString{}
 
-	if err != nil {
-		return err
+	if t.AvatarUrl != "" {
+		_pid, err := insertImgUrlIntoQueue(t.AvatarUrl)
+		if err != nil {
+			return err
+		}
+		pid.String = _pid
+		pid.Valid = true
+	} else {
+		pid.Valid = false
 	}
 
-	_, err = db.Exec(`
+	_, err := db.Exec(`
 	INSERT INTO
 				author (id, coverImg, name)
 			VALUES
@@ -41,10 +61,11 @@ func (t *Author) InsertIntoSQL() error {
 				coverImg = VALUES(coverImg),
 				name = VALUES(name)
 	`, t.Uid, pid, t.Name)
-
 	return err
 }
 
+//ReplyFloor:
+//	not using now
 type ReplyFloor struct {
 	Floor   int    `json:"floor"`
 	Time    int64  `json:"time"`
@@ -53,8 +74,12 @@ type ReplyFloor struct {
 	Digg    int    `jsong:"digg"`
 }
 
+//Reply:
+//	not using now
 type Reply []*ReplyFloor
 
+//Image:
+//
 type Image struct {
 	Ref   string `json:"ref"` //not set if not have
 	Desc  string `json:"desc"`
@@ -76,22 +101,22 @@ func (img *Image) InsertIntoSQL(mid int64) (sql.Result, error) {
 
 type Message struct {
 	//ID          string   `json:"id"`
-	SnapTime    int64    `json:"snaptime"` //*   //lastmodify
-	PubTime     int64    `json:"pubtime"`  //*
-	Source      string   `json:"source"`   //*
-	Body        string   `json:"body"`     //*
-	Title       string   `json:"title"`    //*
-	Subtitle    string   `json:"subtitle"` //*
-	CoverImg    string   `json:"coverimg"` //if not have this field shoud be "" //*
-	Images      []*Image `json:"images"`
-	ReplyNumber int64    `json:"replynumber"`
-	Replys      []Reply  `json:"replys"`
-	ViewType    int      `json:"viewtype"` //*
-	Topic       string   `json:"topic"`    //*
-	Version     string   `json:"version"`
-	Tag         string   `json:"tag"`    //*
-	Author      *Author  `json:"author"` //*
-	Priority    int      `json:"priority"`
+	SnapTime int64    `json:"snaptime"` //*   //lastmodify
+	PubTime  int64    `json:"pubtime"`  //*
+	Source   string   `json:"source"`   //*
+	Body     string   `json:"body"`     //*
+	Title    string   `json:"title"`    //*
+	Subtitle string   `json:"subtitle"` //*
+	CoverImg string   `json:"coverimg"` //if not have this field shoud be "" //*
+	Images   []*Image `json:"images"`
+	//ReplyNumber int64    `json:"replynumber"`
+	//Replys      []Reply  `json:"replys"`
+	ViewType int    `json:"viewtype"` //*
+	Topic    string `json:"topic"`    //*
+	//Version     string   `json:"version"`
+	Tag    string  `json:"tag"`    //*
+	Author *Author `json:"author"` //*
+	//Priority    int      `json:"priority"`
 }
 
 func (m *Message) InsertIntoSQL() (sql.Result, error) {
@@ -214,12 +239,14 @@ func loadConfig() {
 }
 
 func Init() {
+	var err error
+
 	log.Info("Start Load Config")
 	loadConfig()
 
 	log.Info("Start Connect mysql")
 	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?collation=utf8mb4_general_ci", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
-	db, err := sql.Open("mysql", url)
+	db, err = sql.Open("mysql", url)
 	if err != nil {
 		log.Panic("Can't Connect DB REASON : " + err.Error())
 		return

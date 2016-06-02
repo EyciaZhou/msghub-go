@@ -16,9 +16,9 @@ var (
 
 var (
 	authorNetEaseNews = &Interface.Author{
-		Uid:         "NetEaseNews",
-		Name:        "网易新闻",
-		CoverSource: "http://www.apk20.com/image/icon-385074",
+		Uid:       "NetEaseNews",
+		Name:      "网易新闻",
+		AvatarUrl: "http://www.apk20.com/image/icon-385074",
 	}
 )
 
@@ -112,18 +112,18 @@ func (n *PhotoSet) Convert() (*Interface.Message, error) {
 	}
 
 	return &Interface.Message{
-		SnapTime:    snapti,
-		PubTime:     pubti,
-		Source:      n.URL,
-		Body:        n.Body,
-		Title:       n.Title,
-		Subtitle:    n.SubTitle,
-		CoverImg:    n.CoverURL,
-		Images:      imgs,
-		ReplyNumber: (int64)(n.ReplyCount),
-		Replys:      replys,
-		ViewType:    Interface.VIEW_TYPE_PICTURES,
-		Author:      authorNetEaseNews,
+		SnapTime: snapti,
+		PubTime:  pubti,
+		Source:   n.URL,
+		Body:     n.Body,
+		Title:    n.Title,
+		Subtitle: n.SubTitle,
+		CoverImg: n.CoverURL,
+		Images:   imgs,
+		//	ReplyNumber: (int64)(n.ReplyCount),
+		//	Replys:      replys,
+		ViewType: Interface.VIEW_TYPE_PICTURES,
+		Author:   authorNetEaseNews,
 	}, nil
 }
 
@@ -159,19 +159,18 @@ func (n *NormalNews) Convert() (*Interface.Message, error) {
 	}
 
 	return &Interface.Message{
-		SnapTime:    snapti,
-		PubTime:     pubti,
-		Source:      n.URL,
-		Body:        n.Body,
-		Title:       n.Title,
-		Subtitle:    n.SubTitle,
-		CoverImg:    n.CoverURL,
-		Images:      imgs,
-		ReplyNumber: (int64)(n.ReplyCount),
-		Replys:      replys,
-		ViewType:    Interface.VIEW_TYPE_NORMAL,
-		Version:     "0.1",
-		Author:      authorNetEaseNews,
+		SnapTime: snapti,
+		PubTime:  pubti,
+		Source:   n.URL,
+		Body:     n.Body,
+		Title:    n.Title,
+		Subtitle: n.SubTitle,
+		CoverImg: n.CoverURL,
+		Images:   imgs,
+		//	ReplyNumber: (int64)(n.ReplyCount),
+		//	Replys:      replys,
+		ViewType: Interface.VIEW_TYPE_NORMAL,
+		Author:   authorNetEaseNews,
 	}, nil
 }
 
