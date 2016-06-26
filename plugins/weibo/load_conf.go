@@ -1,32 +1,46 @@
 package weibo
 
 import (
-	"encoding/json"
+	"errors"
 	"github.com/EyciaZhou/msghub.go/plugins"
+	"github.com/EyciaZhou/msghub.go/plugins/plugin"
 	"github.com/EyciaZhou/msghub.go/plugins/weibo/api"
 	"time"
 )
 
-type conf struct {
-	Token     string `json:"token"`
-	Delay     string `json:"delay"`
-	FetchEach int    `json:"fetch_each"`
+type user_conf struct {
+	Token string `can_null:"false" desc:"微博的token"`
 }
 
-func LoadConf(raw []byte) ([]plugins.GetNewer, error) {
-	var c conf
-	err := json.Unmarshal(raw, &c)
-	if err != nil {
-		return nil, err
+func (p *PluginWeibo) ResumeTask(status []byte) (PluginInterface.PluginTask, error) {
+	return weibo_api.ResumeFriendsTimelineController(status)
+}
+
+func (p *PluginWeibo) NewTask(Config interface{}) (PluginInterface.PluginTask, error) {
+	if v, ok := Config.(*user_conf); !ok {
+		return nil, errors.New("config type error")
+	} else {
+		return weibo_api.NewFriendsTimelineController(
+			v.Token,
+			"",
+			10*time.Minute,
+			100,
+		), nil
 	}
-
-	dur, err := time.ParseDuration(c.Delay)
-
-	return []plugins.GetNewer{
-		weibo_api.NewFriendsTimelineController(c.Token, "", dur, c.FetchEach),
-	}, nil
 }
+
+func (p *PluginWeibo) GetConfigType() interface{} {
+	return &user_conf{}
+}
+
+func (p *PluginWeibo) Name() string {
+	return "新浪微博"
+}
+
+type PluginWeibo struct{}
+
+var pluginWeibo = &PluginWeibo{}
 
 func init() {
-	plugins.Register("weibo", (plugins.LoadConf)(LoadConf))
+	plugin.Register("weibo", pluginWeibo)
 }

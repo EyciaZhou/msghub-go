@@ -2,6 +2,7 @@ package nenews_api
 
 import (
 	//"encoding/json"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/EyciaZhou/msghub.go/ErrorUtiles"
@@ -34,7 +35,8 @@ func specialURL(id string) string {
 }
 
 const (
-	_SPECIA_URL_PREFIX = "nenews_specia_"
+	_SPECIA_ID_PREFIX = "nenews_specia_"
+	_TOPIC_ID_PREFIX  = "nenews_list_"
 )
 
 /*
@@ -202,15 +204,12 @@ func parseNewsList(baseInfoList []map[string]interface{}) ([]nenews_types.News, 
 }
 
 type ChannController struct {
-	channName string
 	listId    string
-
 	delayTime time.Duration
 }
 
-func NewChannController(channName string, listId string, delayTime time.Duration) *ChannController {
+func NewChannController(listId string, delayTime time.Duration) *ChannController {
 	return &ChannController{
-		channName,
 		listId,
 		delayTime,
 	}
@@ -237,12 +236,16 @@ func (p *ChannController) apiGetNewsChannel(page int) (r *nenews_types.Topic, er
 
 	return &nenews_types.Topic{
 		Newss: newss,
-		Id:    "nenews_list_" + p.listId,
-		Title: p.channName,
+		Id:    _TOPIC_ID_PREFIX + p.listId,
+		//Title: p.channName,
 	}, nil
 }
 
-func (p *ChannController) GetNew() (*Interface.Topic, error) {
+func (p *ChannController) Type() string {
+	return "neteasenews"
+}
+
+func (p *ChannController) FetchNew() ([]*Interface.Message, error) {
 	ne_topic, err := p.apiGetNewsChannel(0)
 	if err != nil {
 		return nil, err
@@ -250,13 +253,39 @@ func (p *ChannController) GetNew() (*Interface.Topic, error) {
 	return ne_topic.Convert(), nil
 }
 
-func (p *ChannController) DelayBetweenCatchRound() time.Duration {
+func (p *ChannController) GetDelayBetweenCatchRound() time.Duration {
 	return p.delayTime
+}
+
+func (p *ChannController) DumpTaskStatus() (Status []byte) {
+	bs, _ := json.Marshal(map[string]interface{}{"TYPE": "CHANNEL", "VALUE": map[string]interface{}{
+		"list_id": p.listId,
+		"delay":   p.delayTime,
+	}})
+	return bs
+}
+
+func ResumeChannController(conf map[string]interface{}) (*ChannController, error) {
+	if conf == nil {
+		return nil, errors.New("error when resume ChannController : config is nil")
+	}
+	listId, ok1 := conf["list_id"]
+	ListId, ok3 := listId.(string)
+	delay, ok2 := conf["delay"]
+	Delay, ok4 := delay.(float64)
+
+	if !ok1 || !ok2 || !ok3 || !ok4 {
+		return nil, errors.New("error when resume ChannController : missing field")
+	}
+	return NewChannController(ListId, (time.Duration)(Delay)), nil
+}
+
+func (p *ChannController) Hash() string {
+	return "neteasenews_channel_" + p.listId
 }
 
 type TopicController struct {
 	specialId string
-
 	delayTime time.Duration
 }
 
@@ -296,13 +325,17 @@ func (p *TopicController) apiGetSpecialList() (r *nenews_types.Topic, er error) 
 	}
 
 	return &nenews_types.Topic{
-		Id:    _SPECIA_URL_PREFIX + p.specialId,
+		Id:    _SPECIA_ID_PREFIX + p.specialId,
 		Title: infos["sname"].(string), //panic
 		Newss: newss,
 	}, nil
 }
 
-func (p *TopicController) GetNew() (*Interface.Topic, error) {
+func (p *TopicController) Type() string {
+	return "neteasenews"
+}
+
+func (p *TopicController) FetchNew() ([]*Interface.Message, error) {
 	topic, err := p.apiGetSpecialList()
 	if err != nil {
 		return nil, err
@@ -310,6 +343,33 @@ func (p *TopicController) GetNew() (*Interface.Topic, error) {
 	return topic.Convert(), nil
 }
 
-func (p *TopicController) DelayBetweenCatchRound() time.Duration {
+func (p *TopicController) GetDelayBetweenCatchRound() time.Duration {
 	return p.delayTime
+}
+
+func (p *TopicController) DumpTaskStatus() (Status []byte) {
+	bs, _ := json.Marshal(map[string]interface{}{"TYPE": "SPECIAL", "VALUE": map[string]interface{}{
+		"specialId": p.specialId,
+		"delay":     p.delayTime,
+	}})
+	return bs
+}
+
+func ResumeTopicController(conf map[string]interface{}) (*TopicController, error) {
+	if conf == nil {
+		return nil, errors.New("error when resume TopicController : config is nil")
+	}
+	listId, ok1 := conf["specialId"]
+	ListId, ok3 := listId.(string)
+	delay, ok2 := conf["delay"]
+	Delay, ok4 := delay.(float64)
+
+	if !ok1 || !ok2 || !ok3 || !ok4 {
+		return nil, errors.New("error when resume ChannController : missing field")
+	}
+	return NewTopicController(ListId, (time.Duration)(Delay)), nil
+}
+
+func (p *TopicController) Hash() string {
+	return "neteasenews_special_" + p.specialId
 }

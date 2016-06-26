@@ -1,21 +1,26 @@
-CREATE SCHEMA `msghub`;
+drop table picref;
+drop table plugin_conf;
+drop table topic;
+drop table msg;
+drop table author;
+drop table pic_task_queue;
 
-USE `msghub`;
+CREATE DATABASE usr;
 
-DROP TABLE  IF EXISTS `picref`;
-DROP TABLE  IF EXISTS `msg`;
-DROP TABLE  IF EXISTS `topic`;
-DROP TABLE  IF EXISTS `author`;
-DROP TABLE  IF EXISTS `pic_task_queue`;
-
-
-CREATE TABLE `topic` (
-  `id` varchar(30) CHARACTER SET utf8 NOT NULL,
-  `Title` text CHARACTER SET utf8mb4 NOT NULL,
-  `LastModify` int(10) unsigned NOT NULL,
+CREATE TABLE `_user` (
+  `id` int(10) unsigned zerofill NOT NULL AUTO_INCREMENT,
+  `username` varchar(16) NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `nickname` varchar(40) CHARACTER SET utf8 NOT NULL,
+  `pwd` varbinary(64) NOT NULL,
+  `salt` varbinary(10) NOT NULL,
+  `master` int(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  KEY `LastModify` (`LastModify`)
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE database msghub;
 
 CREATE TABLE `pic_task_queue` (
   `id` int(10) unsigned zerofill NOT NULL AUTO_INCREMENT,
@@ -33,7 +38,7 @@ CREATE TABLE `pic_task_queue` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `author` (
-  `id` varchar(30) CHARACTER SET utf8 NOT NULL,
+  `id` varchar(64) CHARACTER SET utf8 NOT NULL,
   `coverImg` int(10) unsigned zerofill DEFAULT NULL,
   `name` varchar(30) CHARACTER SET utf8mb4 NOT NULL,
   PRIMARY KEY (`id`),
@@ -51,17 +56,35 @@ CREATE TABLE `msg` (
   `SubTitle` text CHARACTER SET utf8mb4 NOT NULL,
   `CoverImg` int(10) unsigned zerofill DEFAULT NULL,
   `ViewType` tinyint(4) NOT NULL,
-  `AuthorId` varchar(30) CHARACTER SET utf8 DEFAULT NULL,
+  `AuthorId` varchar(64) CHARACTER SET utf8 DEFAULT NULL,
   `Tag` varchar(30) CHARACTER SET utf8mb4 NOT NULL,
-  `Topic` varchar(30) CHARACTER SET utf8 DEFAULT NULL,
+  `Topic` varchar(64) CHARACTER SET utf8 DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `SourceURL` (`SourceURL`),
+  UNIQUE KEY `SourceURL` (`SourceURL`,`Topic`),
   KEY `ma` (`AuthorId`),
   KEY `SnapTime` (`SnapTime`,`id`) USING BTREE,
   KEY `CoverImg` (`CoverImg`),
   KEY `Topic` (`Topic`,`SnapTime`,`id`) USING BTREE,
   CONSTRAINT `authorid2aid` FOREIGN KEY (`AuthorId`) REFERENCES `author` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `coverimg2pid_msg` FOREIGN KEY (`CoverImg`) REFERENCES `pic_task_queue` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `plugin_conf` (
+  `id` varchar(64) NOT NULL,
+  `plugin_type` varchar(20) NOT NULL,
+  `config` text CHARACTER SET utf8mb4 NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `topic` (
+  `topic_hash` varchar(64) NOT NULL,
+  `title` text CHARACTER SET utf8mb4 NOT NULL,
+  `uid` int(10) unsigned zerofill NOT NULL,
+  UNIQUE KEY `uid_topic_hash` (`topic_hash`,`uid`),
+  KEY `uid` (`uid`),
+  KEY `topic_hash` (`topic_hash`),
+  CONSTRAINT `topic_plugin_conf_id` FOREIGN KEY (`topic_hash`) REFERENCES `plugin_conf` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `topic_uid` FOREIGN KEY (`uid`) REFERENCES `usr`.`_user` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE `picref` (

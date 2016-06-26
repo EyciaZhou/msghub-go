@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/EyciaZhou/msghub.go/ErrorUtiles"
 	"github.com/EyciaZhou/msghub.go/interface"
-	"github.com/EyciaZhou/msghub.go/plugins"
 	_ "github.com/EyciaZhou/msghub.go/plugins/netease_news"
 	_ "github.com/EyciaZhou/msghub.go/plugins/rss"
+	"github.com/EyciaZhou/msghub.go/plugins/task"
 	_ "github.com/EyciaZhou/msghub.go/plugins/weibo"
 	"github.com/Sirupsen/logrus"
 	"time"
@@ -16,7 +16,7 @@ func main() {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	Interface.Init()
-	plugins.Init()
+	go task.TaskWatchLoop()
 
 	for {
 		time.Sleep(time.Second)

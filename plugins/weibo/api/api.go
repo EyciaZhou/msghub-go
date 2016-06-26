@@ -1,8 +1,10 @@
 package weibo_api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/EyciaZhou/msghub-http/Utils"
 	"github.com/EyciaZhou/msghub.go/HttpUtils"
 	"github.com/EyciaZhou/msghub.go/interface"
 	"github.com/EyciaZhou/msghub.go/plugins/weibo/types"
@@ -34,8 +36,8 @@ func weiboErrorChecker(bs []byte) error {
 
 func (p *FriendsTimelineController) firstPage() ([]*weibo_types.Tweet, error) {
 	args := url.Values{
-		"access_token": {p.token},
-		"count":        {strconv.Itoa(p.fetchEach)},
+		"access_token": {p.Token},
+		"count":        {strconv.Itoa(p.FetchEach)},
 	}
 
 	wtl := weibo_types.Timeline{}
@@ -69,7 +71,7 @@ func (p *FriendsTimelineController) since(SinceId string) ([]*weibo_types.Tweet,
 
 		tweets = append(tweets, tweets_new...)
 
-		if len(tweets_new) < p.fetchEach/2 {
+		if len(tweets_new) < p.FetchEach/2 {
 			return tweets, nil
 		}
 	}
@@ -77,9 +79,9 @@ func (p *FriendsTimelineController) since(SinceId string) ([]*weibo_types.Tweet,
 
 func (p *FriendsTimelineController) pageFlip(SinceId string) ([]*weibo_types.Tweet, error) {
 	args := url.Values{
-		"access_token": {p.token},
+		"access_token": {p.Token},
 		"since_id":     {SinceId},
-		"count":        {strconv.Itoa(p.fetchEach)},
+		"count":        {strconv.Itoa(p.FetchEach)},
 	}
 
 	wtl := weibo_types.Timeline{}
@@ -98,38 +100,57 @@ func (p *FriendsTimelineController) pageFlip(SinceId string) ([]*weibo_types.Twe
 }
 
 type FriendsTimelineController struct {
-	token string
-	lstid string
+	Token string `json:"token"`
+	Lstid string `json:"lstid"`
 
-	delay     time.Duration
-	fetchEach int
+	Delay     time.Duration `json:"delay"`
+	FetchEach int           `json:"fetch_each"`
+}
+
+func ResumeFriendsTimelineController(Status []byte) (*FriendsTimelineController, error) {
+	result := &FriendsTimelineController{}
+	err := json.Unmarshal(Status, result)
+	return result, err
 }
 
 func NewFriendsTimelineController(token string, lstid string, delay time.Duration, fetchEach int) *FriendsTimelineController {
 	return &FriendsTimelineController{
-		token:     token,
-		lstid:     lstid,
-		delay:     delay,
-		fetchEach: fetchEach,
+		Token:     token,
+		Lstid:     lstid,
+		Delay:     delay,
+		FetchEach: fetchEach,
 	}
 }
 
-func (p *FriendsTimelineController) DelayBetweenCatchRound() time.Duration {
-	return p.delay
+func (p *FriendsTimelineController) Type() string {
+	return "weibo"
 }
 
-func (p *FriendsTimelineController) GetNew() (*Interface.Topic, error) {
-	if p.lstid == "" {
+func (p *FriendsTimelineController) GetDelayBetweenCatchRound() time.Duration {
+	return p.Delay
+}
+
+func (p *FriendsTimelineController) FetchNew() ([]*Interface.Message, error) {
+	if p.Lstid == "" {
 		ts, err := p.firstPage()
 		if err == nil && len(ts) > 0 {
-			p.lstid = ts[0].Idstr
+			p.Lstid = ts[0].Idstr
 		}
 		return (weibo_types.Tweets)(ts).Convert(), err
 	}
 
-	ts, err := p.since(p.lstid)
+	ts, err := p.since(p.Lstid)
 	if err == nil && len(ts) > 0 {
-		p.lstid = ts[0].Idstr
+		p.Lstid = ts[0].Idstr
 	}
 	return (weibo_types.Tweets)(ts).Convert(), err
+}
+
+func (p *FriendsTimelineController) DumpTaskStatus() (Status []byte) {
+	result, _ := json.Marshal(p)
+	return result
+}
+
+func (p *FriendsTimelineController) Hash() string {
+	return "weibo_" + hex.EncodeToString(Utils.Sha1(([]byte)(p.Token)))
 }

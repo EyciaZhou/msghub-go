@@ -7,14 +7,23 @@ import (
 	"errors"
 	"github.com/EyciaZhou/msghub.go/interface"
 	"github.com/EyciaZhou/msghub.go/plugins"
+	"github.com/EyciaZhou/msghub.go/plugins/plugin"
 	"github.com/EyciaZhou/rss"
 	"time"
 )
 
+type user_conf struct {
+	URL string `can_null:"false" desc:"RSS地址"`
+}
+
 type RssController struct {
 	Url string `json:"url"`
 
-	delayBetweenCatchRound time.Duration
+	delayBetweenCatchRound time.Duration `json:"delay"`
+}
+
+func (p *RssController) Type() string {
+	return "rss"
 }
 
 func (p *RssController) GetFeed() (*rss.Feed, error) {
@@ -27,25 +36,17 @@ func (p *RssController) GetFeed() (*rss.Feed, error) {
 
 type feed rss.Feed
 
-func (p *feed) TransTo() (*Interface.Topic, error) {
+func (p *feed) TransTo(FecherId string) ([]*Interface.Message, error) {
 	if p.Link == "" {
 		return nil, errors.New("Link is empty")
 	}
-	result := new(Interface.Topic)
-
-	_hash_link := md5.Sum(([]byte)(p.Link))
-
-	result.Id = "rss_" + hex.EncodeToString(_hash_link[:])
-	result.Title = p.Title
 
 	msgs := make([]*Interface.Message, len(p.Items))
 
 	author := &Interface.Author{}
 	author.AvatarUrl = p.Image.Url
 	author.Name = p.Nickname
-	author.Uid = result.Id + "_" + author.Name
-
-	lstModify := (int64)(0)
+	author.Uid = FecherId + "_" + author.Name
 
 	cnt := 0
 	for _, item := range p.Items {
@@ -63,36 +64,38 @@ func (p *feed) TransTo() (*Interface.Topic, error) {
 		next.CoverImg = "" //?
 		next.Images = nil
 		next.ViewType = Interface.VIEW_TYPE_NORMAL
-		next.Topic = result.Id
 		next.Tag = ""
 		next.Author = author
 		//		next.Priority = 0
-
-		if next.SnapTime > lstModify {
-			lstModify = next.SnapTime
-		}
 
 		msgs[cnt] = next
 
 		cnt++
 	}
-	result.LastModify = lstModify
-	result.Msgs = msgs[:cnt]
-
-	return result, nil
+	return msgs[:cnt], nil
 }
 
-func (p *RssController) GetNew() (*Interface.Topic, error) {
+func (p *RssController) FetchNew() ([]*Interface.Message, error) {
 	_feed, err := rss.Fetch(p.Url)
 	if err != nil {
 		return nil, err
 	}
 	p.delayBetweenCatchRound = _feed.Refresh.Sub(time.Now())
-	return (*feed)(_feed).TransTo()
+	return (*feed)(_feed).TransTo(p.Hash())
 }
 
-func (p *RssController) DelayBetweenCatchRound() time.Duration {
+func (p *RssController) GetDelayBetweenCatchRound() time.Duration {
 	return p.delayBetweenCatchRound
+}
+
+func (p *RssController) DumpTaskStatus() (Status []byte) {
+	bs, _ := json.Marshal(p)
+	return bs
+}
+
+func (p *RssController) Hash() string {
+	md5ed := md5.Sum(([]byte(p.Url)))
+	return "rss_" + hex.EncodeToString(md5ed[:])
 }
 
 func NewRssController(url string) *RssController {
@@ -102,26 +105,35 @@ func NewRssController(url string) *RssController {
 	}
 }
 
-func LoadConf(conf_bs []byte) ([]plugins.GetNewer, error) {
-	var confs []*RssController
+type PluginRss struct{}
 
-	err := json.Unmarshal(conf_bs, &confs)
+var pluginRss = &PluginRss{}
+
+func (p *PluginRss) ResumeTask(status []byte) (PluginInterface.PluginTask, error) {
+	confs := RssController{}
+	err := json.Unmarshal(status, &confs)
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(confs); i++ {
-		confs[i].delayBetweenCatchRound = time.Minute * 10
+	return &confs, nil
+}
+
+func (p *PluginRss) NewTask(Config interface{}) (PluginInterface.PluginTask, error) {
+	if v, ok := Config.(*user_conf); !ok {
+		return nil, errors.New("config type error")
+	} else {
+		return NewRssController(v.URL), nil
 	}
+}
 
-	plugins := make([]plugins.GetNewer, len(confs))
+func (p *PluginRss) GetConfigType() interface{} {
+	return &user_conf{}
+}
 
-	for i, conf := range confs {
-		plugins[i] = conf
-	}
-
-	return plugins, nil
+func (p *PluginRss) Name() string {
+	return "RSS订阅"
 }
 
 func init() {
-	plugins.Register("Rss", (plugins.LoadConf)(LoadConf))
+	plugin.Register("rss", pluginRss)
 }

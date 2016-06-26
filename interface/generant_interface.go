@@ -172,26 +172,13 @@ func (m *Message) InsertIntoSQL() (sql.Result, error) {
 	return res, nil
 }
 
-type Topic struct {
-	Id         string     `json:"id"`
-	Title      string     `json:"title"`
-	Msgs       []*Message `json:"messages"`
-	LastModify int64      `json:"lastmodify"`
-}
-
-func (t *Topic) InsertIntoSQL() error {
-	_, err := StmtTopicInsert.Exec(t.Id, t.Title, t.LastModify)
-	if err != nil {
-		return err
-	}
-
-	for _, msg := range t.Msgs {
-		_, err = msg.InsertIntoSQL()
+func MsgsInsertIntoSQL(msgs []*Message) error {
+	for _, msg := range msgs {
+		_, err := msg.InsertIntoSQL()
 		if err != nil {
 			log.Warn(err.Error())
 		}
 	}
-
 	return nil
 }
 
@@ -212,7 +199,7 @@ var (
 	StmtInsert           *sql.Stmt
 	StmtInsertRef        *sql.Stmt
 	StmtSelectMidFromURL *sql.Stmt
-	StmtTopicInsert      *sql.Stmt
+	//	StmtTopicInsert      *sql.Stmt
 
 	ErrorNotInvaildURL = errors.New("url is not invaild")
 )
@@ -286,14 +273,14 @@ func Init() {
 		return
 	}
 
-	StmtTopicInsert, err = db.Prepare(fmt.Sprintf(
-		`INSERT INTO
-				%s (id, Title, LastModify)
-			VALUES
-				(?,?,?)
-			ON DUPLICATE KEY UPDATE
-				Title = VALUES(Title),
-				LastModify = VALUES(LastModify)`, config.TopicTableName))
+	/*StmtTopicInsert, err = db.Prepare(fmt.Sprintf(
+	`INSERT INTO
+			%s (id, Title, LastModify)
+		VALUES
+			(?,?,?)
+		ON DUPLICATE KEY UPDATE
+			Title = VALUES(Title),
+			LastModify = VALUES(LastModify)`, config.TopicTableName))*/
 
 	StmtInsertRef, err = db.Prepare(fmt.Sprintf(
 		`INSERT INTO

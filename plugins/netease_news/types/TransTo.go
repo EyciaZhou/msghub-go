@@ -174,7 +174,7 @@ func (n *NormalNews) Convert() (*Interface.Message, error) {
 	}, nil
 }
 
-func (p *Topic) Convert() *Interface.Topic {
+func (p *Topic) Convert() []*Interface.Message {
 	result := make([]*Interface.Message, len(p.Newss))
 
 	cnt := 0
@@ -190,12 +190,7 @@ func (p *Topic) Convert() *Interface.Topic {
 		cnt++
 	}
 
-	return &Interface.Topic{
-		Id:         p.Id,
-		Title:      p.Title,
-		Msgs:       result[:cnt],
-		LastModify: time.Now().Unix(),
-	}
+	return result[:cnt]
 }
 
 func init() {

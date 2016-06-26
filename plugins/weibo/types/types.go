@@ -40,7 +40,7 @@ type Timeline struct {
 
 type Tweets []*Tweet
 
-func (p Tweets) Convert() *Interface.Topic {
+func (p Tweets) Convert() []*Interface.Message {
 	result := make([]*Interface.Message, len(p))
 
 	cnt := 0
@@ -55,12 +55,7 @@ func (p Tweets) Convert() *Interface.Topic {
 		cnt++
 	}
 
-	return &Interface.Topic{
-		"weibo_friendsline",
-		"weibo",
-		result[:cnt],
-		time.Now().Unix(),
-	}
+	return result[:cnt]
 }
 
 type Error struct {

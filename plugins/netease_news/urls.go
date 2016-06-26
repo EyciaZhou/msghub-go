@@ -7,6 +7,7 @@ type NeteaseNewsChannel struct {
 }
 
 var (
+	//name from http://c.3g.163.com/nc/topicset/default.html
 	channelsDefault map[string]*NeteaseNewsChannel = map[string]*NeteaseNewsChannel{
 		"toutiao": {
 			"头条",
